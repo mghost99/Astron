@@ -31,8 +31,7 @@ curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
 Add MongoDB to the sources.list:
 ```
 echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-```
-```
+
 sudo apt update
 ```
 
@@ -44,68 +43,52 @@ sudo apt-get install -y mongodb-org
 Start the service and make sure it is active:
 ```
 sudo systemctl start mongod
-```
-```
+
 sudo systemctl status mongod
 ```
 
 ## (Optional) Install libmongocrypt ##
 ```
 sudo sh -c 'curl -s --location https://www.mongodb.org/static/pgp/libmongocrypt.asc | gpg --dearmor >/etc/apt/trusted.gpg.d/libmongocrypt.gpg'
-```
-```
+
 echo "deb https://libmongocrypt.s3.amazonaws.com/apt/debian jammy/libmongocrypt/1.8 main" | sudo tee /etc/apt/sources.list.d/libmongocrypt.list
-```
-```
+
 sudo apt-get update
-```
-```
+
 sudo apt-get install -y libmongocrypt-dev
 ```
 
 ## Install mongo-c-driver ##
 ```
 wget https://github.com/mongodb/mongo-c-driver/releases/download/1.24.4/mongo-c-driver-1.24.4.tar.gz
-```
-```
+
 tar xzf mongo-c-driver-1.24.4.tar.gz
-```
-```
+
 cd mongo-c-driver-1.24.4
-```
-```
+
 mkdir cmake-build
-```
-```
+
 cd cmake-build
-```
-```
+
 cmake -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF ..
-```
-```
+
 make
-```
-```
+
 sudo make install
 ```
 
 ## Install mongo-cxx-driver ##
 ```
 curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.1/mongo-cxx-driver-r3.8.1.tar.gz
-```
-```
+
 tar -xzf mongo-cxx-driver-r3.8.1.tar.gz
-```
-```
+
 cd mongo-cxx-driver-r3.8.1/build
-```
-```
+
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_RPATH=/usr/local/lib
-```
-```
+
 make
-```
-```
+
 sudo make install
 ```
 
@@ -130,6 +113,7 @@ cd Astron/build
 **Build Astron (astrond)**
 ```
 cmake ..
+
 make
 ```
 
