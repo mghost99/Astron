@@ -14,7 +14,7 @@ the workload of managing a multi-sharded game/application environment with many 
 ***Build status is unavailable at this time***
 
 # MongoDB build #
-*The commands below assumes you are using a Linux distro with apt package manager and Python 3.5 to 3.10.*
+*The commands below assume you are using a Linux distro with apt package manager and Python 3.5 to 3.10.*
 
 This should be all packages needed on Ubuntu 22.04 (23.04 breaks easily due to Python 3.11 so its best to avoid it)
 ```
