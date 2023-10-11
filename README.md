@@ -11,7 +11,7 @@ Group, and used in-house from 2001 until 2013.
 The suite consists of many components, which handle separate tasks in order to distribute
 the workload of managing a multi-sharded game/application environment with many objects and clients.
 
-[![Build Status](https://travis-ci.org/Astron/Astron.svg?branch=master)](https://travis-ci.org/Astron/Astron)
+***Build status is unavailable at this time***
 
 ## MongoDB build ##
 *The commands below assumes you are using a Linux distro with apt package manager and Python 3.5 to 3.10.*
