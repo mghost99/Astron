@@ -175,8 +175,8 @@ if(BUILD_DBSERVER)
 	endif()
 
 	### Check for the presence of the MongoDB client library ###
-	find_package(mongo::mongocxx_shared QUIET)
-	find_package(mongo::bsoncxx_shared QUIET)
+	find_package(libmongocxx QUIET)
+	find_package(libbsoncxx QUIET)
 	find_package(libmongocxx-static QUIET)
 	find_package(libbsoncxx-static QUIET)
 
@@ -458,7 +458,14 @@ endif()
 add_subdirectory(src/dclass)
 
 add_dependencies(astrond dclass)
-target_link_libraries(astrond dclass ${YAMLCPP_LIBRARY} ${DB_LIBRARY_NAMES} ${LIBUV_LIBRARY} ${EXTRA_LIBS})
+target_link_libraries(astrond
+    dclass
+    ${YAMLCPP_LIBRARY}
+    ${DB_LIBRARY_NAMES}
+    ${LIBUV_LIBRARY}
+    ${EXTRA_LIBS}
+)
+
 install(TARGETS astrond DESTINATION bin)
 
 ### Handle some final testing configuration ###
