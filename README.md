@@ -117,17 +117,17 @@ sudo apt install git
 ```
 
 If you already have `git` installed, let's continue.
-*Clone the repository*
+**Clone the repository**
 ```
 git clone https://github.com/mghost99/Astron
 ```
 
-*cd into the `Astron` folder and then cd into the `build` folder.
+**cd into the `Astron` folder and then cd into the `build` folder.**
 ```
 cd Astron/build
 ```
 
-*Build Astron (astrond)*
+**Build Astron (astrond)**
 ```
 cmake ..
 make
