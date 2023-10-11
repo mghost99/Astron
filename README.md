@@ -144,22 +144,12 @@ Copy it wherever you need it, and we're basically done!
 For those who currently use the YAML database and want to use MongoDB instead,
 replace the following:
 ```
-    - type: database
-      control: 4003
-      generate:
-        min: 100000000
-        max: 399999999
       backend:
         type: yaml
         directory: ../databases/astrondb
 ```
 with
 ```
-    - type: database
-      control: 4003
-      generate:
-        min: 100000000
-        max: 399999999
       backend:
         type: mongodb
         server: 127.0.0.1:21021
