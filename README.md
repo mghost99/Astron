@@ -13,6 +13,160 @@ the workload of managing a multi-sharded game/application environment with many 
 
 [![Build Status](https://travis-ci.org/Astron/Astron.svg?branch=master)](https://travis-ci.org/Astron/Astron)
 
+## MongoDB build ##
+*The commands below assumes you are using a Linux distro with apt package manager and Python 3.5 to 3.10.*
+This should be all files needed on Ubuntu 22.04 (23.04 breaks easily due to Python 3.11 so its best to avoid it)
+```
+sudo apt install gnupg curl libicu-dev pkg-config libyaml-cpp-dev libboost-dev libuv1-dev bison flex
+```
+# Installing MongoDB Community #
+
+Import the MongoDB public GPG key:
+```
+curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
+   sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg \
+   --dearmor
+```
+
+Add MongoDB to the sources.list:
+```
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+```
+```
+sudo apt update
+```
+
+Install MongoDB Community:
+```
+sudo apt-get install -y mongodb-org
+```
+
+Start the service and make sure it is active:
+```
+sudo systemctl start mongod
+```
+```
+sudo systemctl status mongod
+```
+
+## (Optional) Install libmongocrypt ##
+```
+sudo sh -c 'curl -s --location https://www.mongodb.org/static/pgp/libmongocrypt.asc | gpg --dearmor >/etc/apt/trusted.gpg.d/libmongocrypt.gpg'
+```
+```
+echo "deb https://libmongocrypt.s3.amazonaws.com/apt/debian jammy/libmongocrypt/1.8 main" | sudo tee /etc/apt/sources.list.d/libmongocrypt.list
+```
+```
+sudo apt-get update
+```
+```
+sudo apt-get install -y libmongocrypt-dev
+```
+
+## Install mongo-c-driver ##
+```
+wget https://github.com/mongodb/mongo-c-driver/releases/download/1.24.4/mongo-c-driver-1.24.4.tar.gz
+```
+```
+tar xzf mongo-c-driver-1.24.4.tar.gz
+```
+```
+cd mongo-c-driver-1.24.4
+```
+```
+mkdir cmake-build
+```
+```
+cd cmake-build
+```
+```
+cmake -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF ..
+```
+```
+make
+```
+```
+sudo make install
+```
+
+## Install mongo-cxx-driver ##
+```
+curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.8.1/mongo-cxx-driver-r3.8.1.tar.gz
+```
+```
+tar -xzf mongo-cxx-driver-r3.8.1.tar.gz
+```
+```
+cd mongo-cxx-driver-r3.8.1/build
+```
+```
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_RPATH=/usr/local/lib
+```
+```
+make
+```
+```
+sudo make install
+```
+
+## Building Astron ##
+Now that we've gotten all of that out of the way, let's build Astron!
+First things first, clone the repository. If you don't have `git` installed:
+```
+sudo apt install git
+```
+
+If you already have `git` installed, let's continue.
+*Clone the repository*
+```
+git clone https://github.com/mghost99/Astron
+```
+
+*cd into the `Astron` folder and then cd into the `build` folder.
+```
+cd Astron/build
+```
+
+*Build Astron (astrond)*
+```
+cmake ..
+make
+```
+
+You should now have `astrond` in your builds folder.
+Now let's make it read/write:
+```
+chmod +x astrond
+```
+
+Copy it wherever you need it, and we're basically done!
+
+For those who currently use the YAML database and want to use MongoDB instead,
+replace the following:
+```
+    - type: database
+      control: 4003
+      generate:
+        min: 100000000
+        max: 399999999
+      backend:
+        type: yaml
+        directory: ../databases/astrondb
+```
+with
+```
+    - type: database
+      control: 4003
+      generate:
+        min: 100000000
+        max: 399999999
+      backend:
+        type: mongodb
+        server: 127.0.0.1:21021
+        database: test
+```
+replacing `test` with whatever your database is called. This will allow remote MongoDB instances for those wondering (or rather it should unless I borked something..)
+
 ## Overview ##
 
 ### Objects ###
