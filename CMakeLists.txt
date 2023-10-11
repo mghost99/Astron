@@ -75,7 +75,7 @@ endif()
 # Common flags:
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-error=deprecated-declarations")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-error=deprecated-declarations -Wno-error=free-nonheap-object")
 endif()
 
 # Clang-specific flags:
@@ -84,7 +84,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 ### Debug Flags -- compile in spam/debug log messages ###
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DASTRON_DEBUG_MESSAGES")
+# Note: Ignoring 'free-nonheap-object' warns due to Bison issue in the generated parser.cpp file.
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3 -O0 -DASTRON_DEBUG_MESSAGES -Wno-error=free-nonheap-object")
 
 
 ### OS Specific Settings ###
@@ -174,8 +175,8 @@ if(BUILD_DBSERVER)
 	endif()
 
 	### Check for the presence of the MongoDB client library ###
-	find_package(libmongocxx QUIET)
-	find_package(libbsoncxx QUIET)
+	find_package(mongo::mongocxx_shared QUIET)
+	find_package(mongo::bsoncxx_shared QUIET)
 	find_package(libmongocxx-static QUIET)
 	find_package(libbsoncxx-static QUIET)
 

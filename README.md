@@ -4,7 +4,7 @@ Astron Project
 
 _A Server Technology for Realtime Object Networking_
 
-Astron is an open-source, distributed server suite particularly well-suited for powering MMO games.
+Astron is an open-source (abandoned in the public, thriving in private), distributed server suite particularly well-suited for powering MMO games.
 The design is inspired by a similar unrelated project developed at the Disney Interactive Media
 Group, and used in-house from 2001 until 2013.
 
