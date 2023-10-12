@@ -18,7 +18,7 @@ the workload of managing a multi-sharded game/application environment with many 
 
 This should be all packages needed on Ubuntu 22.04 (23.04 breaks easily due to Python 3.11 so its best to avoid it)
 ```
-sudo apt install bison curl flex g++ gnupg libboost-dev libicu-dev libssl-dev libuv1-dev libyaml-cpp-dev libzstd-dev pkg-config 
+sudo apt install bison curl flex g++ gnupg libboost-dev libicu-dev libsasl2-dev libssl-dev libuv1-dev libyaml-cpp-dev libzstd-dev pkg-config 
 ```
 ## Installing MongoDB Community ##
 
