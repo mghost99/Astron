@@ -16,7 +16,7 @@ the workload of managing a multi-sharded game/application environment with many 
 # MongoDB build #
 *The commands below assume you are using a Linux distro with apt package manager and Python 3.5 to 3.9 (3.10 and up aren't working with Panda3D for some reason)
 
-This should be all packages needed on Ubuntu 22.04 (23.04 breaks easily due to Python 3.11 so its best to avoid it)
+This should be all packages needed on Ubuntu 20.04.6 LTS
 ```
 sudo apt install bison curl flex g++ gnupg libboost-dev libicu-dev libsasl2-dev libssl-dev libuv1-dev libyaml-cpp-dev libzstd-dev pkg-config 
 ```
