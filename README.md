@@ -88,7 +88,8 @@ cd mongo-cxx-driver-r3.8.1/build
 
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_RPATH=/usr/local/lib
 
-make
+# Must use sudo or it won't continue.. Odd.
+sudo make 
 
 sudo make install
 ```
