@@ -31,7 +31,7 @@ curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
 
 Add MongoDB to the sources.list:
 ```
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
 
 sudo apt update
 ```
@@ -52,7 +52,7 @@ sudo systemctl status mongod
 ```
 sudo sh -c 'curl -s --location https://www.mongodb.org/static/pgp/libmongocrypt.asc | gpg --dearmor >/etc/apt/trusted.gpg.d/libmongocrypt.gpg'
 
-echo "deb https://libmongocrypt.s3.amazonaws.com/apt/debian jammy/libmongocrypt/1.8 main" | sudo tee /etc/apt/sources.list.d/libmongocrypt.list
+echo "deb https://libmongocrypt.s3.amazonaws.com/apt/debian focal/libmongocrypt/1.8 main" | sudo tee /etc/apt/sources.list.d/libmongocrypt.list
 
 sudo apt-get update
 
