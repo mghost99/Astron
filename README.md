@@ -95,12 +95,7 @@ sudo make install
 
 ## Building Astron ##
 Now that we've gotten all of that out of the way, let's build Astron!
-First things first, clone the repository. If you don't have `git` installed:
-```
-sudo apt install git
-```
 
-If you already have `git` installed, let's continue.
 **Clone the repository**
 ```
 git clone https://github.com/mghost99/Astron
