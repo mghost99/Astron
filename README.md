@@ -18,7 +18,7 @@ the workload of managing a multi-sharded game/application environment with many 
 
 This should be all packages needed on Ubuntu 20.04.6 LTS
 ```
-sudo apt install bison curl flex g++ gnupg libboost-dev libicu-dev libsasl2-dev libssl-dev libuv1-dev libyaml-cpp-dev libzstd-dev pkg-config 
+sudo apt install bison curl flex g++ git gnupg libboost-dev libicu-dev libsasl2-dev libssl-dev libuv1-dev libyaml-cpp-dev libzstd-dev pkg-config 
 ```
 ## Installing MongoDB Community ##
 
