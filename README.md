@@ -132,8 +132,7 @@ with
 ```
       backend:
         type: mongodb
-        server: 127.0.0.1:21021
-        database: test
+        server: mongodb://127.0.0.1/test
 ```
 replacing `test` with whatever your database is called. This will allow remote MongoDB instances for those wondering (or rather it should unless I borked something..)
 
