@@ -89,6 +89,14 @@ void MessageDirector::init_network()
                     this->routing_thread(i);
                 });
             }
+            
+            // Add periodic cleanup task to process terminated participants safely
+            // This ensures participants are only deleted from the main thread
+            m_cleanup_timer = g_loop->resource<uvw::TimerHandle>();
+            m_cleanup_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent&, uvw::TimerHandle&) {
+                this->process_terminates();
+            });
+            m_cleanup_timer->start(uvw::TimerHandle::Time{50}, uvw::TimerHandle::Time{50}); // Every 50ms
         }
 
         m_initialized = true;
@@ -222,8 +230,19 @@ void MessageDirector::process_datagram(MDParticipantInterface *p, DatagramHandle
     }
 
     // Send the datagram to each participant
+    // Make a copy to avoid iterator invalidation if participant terminates during handling
+    std::vector<MDParticipantInterface*> participants_to_notify;
+    participants_to_notify.reserve(receiving_participants.size());
     for(const auto& it : receiving_participants) {
-        auto participant = static_cast<MDParticipantInterface *>(it);
+        participants_to_notify.push_back(static_cast<MDParticipantInterface *>(it));
+    }
+    
+    for(auto participant : participants_to_notify) {
+        // Check if participant is still valid (not terminated)
+        if(participant->is_terminated()) {
+            continue;
+        }
+        
         DatagramIterator msg_dgi(dg, dgi.tell());
 
         try {
@@ -255,8 +274,14 @@ void MessageDirector::process_datagram(MDParticipantInterface *p, DatagramHandle
 
     // N.B. Participants may reach end-of-life after receiving a datagram, or may
     // be terminated in another thread (for example if a network socket closes);
-    // either way, process any received terminates after processing a datagram.
-    process_terminates();
+    // In single-threaded mode, process terminates immediately.
+    // In multi-threaded mode, terminates are processed periodically to avoid
+    // deleting participants while worker threads might be using them.
+    if(m_thread_pool.empty()) {
+        // Single-threaded mode - safe to process immediately
+        process_terminates();
+    }
+    // In threaded mode, terminates are processed by the periodic cleanup task
 }
 
 

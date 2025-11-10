@@ -82,6 +82,9 @@ class MessageDirector final : public ChannelMap
     std::mutex m_participants_lock;
     std::mutex m_terminated_lock;
     
+    // Periodic cleanup timer for thread-safe participant deletion
+    std::shared_ptr<uvw::TimerHandle> m_cleanup_timer;
+    
     void flush_queue();
     void process_datagram(MDParticipantInterface *p, DatagramHandle dg);
     void process_terminates();
