@@ -8,7 +8,8 @@ cmake_install.cmake
 Makefile
 ## Ignore Mac's directory info ##
 .DS_Store
-build/
+build/*
+build-debug/*
 !build/.keep
 *.pyc
 panda/direct/distributed/__init__.py
