@@ -1,0 +1,157 @@
+###############################################################################
+# Astron Debug Configuration
+# 
+# This configuration enables detailed networking logs to see:
+# - Distributed object (dclass) creation and method calls
+# - Client connection events (connect/disconnect)
+# - State changes and interest management
+# - Database operations
+# - Message routing (excluding high-frequency movement updates)
+###############################################################################
+
+daemon:
+  name: "Astron Debug Server"
+  # Optional: Set a URL for identification
+  # url: "http://localhost:7199"
+
+###############################################################################
+# General Configuration
+###############################################################################
+general:
+  # Specify your DC (Distributed Class) files
+  dc_files:
+    - test-debug.dc  # Simple test DC file for debugging
+  
+  # Event logger (optional - for game-wide event logging)
+  # eventlogger: "127.0.0.1:7197"
+
+###############################################################################
+# Message Director - The message routing hub
+###############################################################################
+messagedirector:
+  bind: 127.0.0.1:7199
+  
+  # Enable thread pool for parallel processing (recommended for production)
+  threaded: true
+  
+  # Optional: Connect to upstream MD for multi-server setup
+  # connect: "upstream.server.com:7199"
+
+###############################################################################
+# Client Agent - Handles client connections
+###############################################################################
+roles:
+  - type: clientagent
+    bind: 127.0.0.1:6667  # Client connection port
+    
+    # Client version verification
+    version: "MyGame v1.0"
+    
+    # Optional: Override DC hash if client uses different parser
+    # manual_dc_hash: 0x12345678
+    
+    # Client type and settings
+    client:
+      type: libastron  # Standard Astron client (Panda3D uses this)
+      relocate: false  # Allow clients to relocate owned objects
+      
+      # Heartbeat configuration (0 = disabled)
+      heartbeat_timeout: 15  # seconds before disconnect
+      
+      # Interest management permissions
+      add_interest: visible  # Options: enabled, visible, disabled
+      
+    # Channel range for this ClientAgent to assign to clients
+    channels:
+      min: 1000000
+      max: 1009999
+
+###############################################################################
+# State Server - Manages object state and visibility
+###############################################################################
+  - type: stateserver
+    control: 402000
+
+###############################################################################
+# Database-State Server - Persistent object management  
+###############################################################################
+  - type: dbss
+    # Database to use for this DBSS
+    database: 4003000
+    
+    # Range of object IDs this DBSS manages
+    ranges:
+      - min: 100000000
+        max: 199999999
+
+###############################################################################
+# Database Server - MongoDB backend
+###############################################################################
+  - type: database
+    control: 4003000
+    
+    # ID generation range for this database
+    generate:
+      min: 100000000
+      max: 199999999
+    
+    # MongoDB backend configuration
+    backend:
+      type: mongodb
+      server: mongodb://10.0.0.202:27017/astron_debug  # MongoDB connection
+      workers: 4  # Number of worker threads for DB operations
+
+###############################################################################
+# Logging Configuration (This is where the magic happens!)
+###############################################################################
+
+# Global log settings
+# Run with: ./astrond config-debug.yml --loglevel trace
+# This enables ALL debug output
+
+# Log severities (from most to least verbose):
+# - packet: Raw datagram dumps (VERY verbose)
+# - trace: Execution flow tracking (recommended for debugging)
+# - debug: Debug values and less-common paths
+# - info: Status messages (default)
+# - warning: Potential issues
+# - security: Security violations
+# - error: Errors (always logged)
+# - fatal: Fatal errors (always logged)
+
+# To see detailed networking logs without spam:
+# ./build-debug/astrond config-debug.yml --loglevel trace
+
+# For even more detail (includes raw packets):
+# ./build-debug/astrond config-debug.yml --loglevel packet
+
+###############################################################################
+# What You'll See in Debug Mode
+###############################################################################
+
+# Client Events:
+# - [TRACE] Client Agent: Client connected from 127.0.0.1:12345
+# - [DEBUG] Client Agent: Received CLIENT_HELLO from client...
+# - [TRACE] Client Agent: Client authenticated successfully
+# - [DEBUG] Client Agent: Generating object for client...
+# - [TRACE] Client Agent: Client disconnected
+
+# Object/Dclass Events:
+# - [TRACE] State Server: Creating object <dclass_name>(doid)
+# - [DEBUG] State Server: Object entered zone <parent>:<zone>
+# - [DEBUG] State Server: Field update on <dclass>.<field>
+# - [TRACE] State Server: Object deleted
+
+# Database Events:
+# - [TRACE] Database: Inserting new <dclass>(doid)
+# - [DEBUG] Database: Query for object <doid>
+# - [TRACE] Database: Update fields on <dclass>(doid)
+
+# Message Routing:
+# - [TRACE] Message Director: Processing datagram...
+# - [TRACE] Message Director: Routing thread X processing message
+# - [DEBUG] Message Director: Routing to channel <channel>
+
+# Movement events (if you want them, use --loglevel packet):
+# - [PACKET] Full datagram dumps with hex values
+

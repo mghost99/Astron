@@ -1,0 +1,29 @@
+// Simple DC file for debugging Astron server
+
+from direct.distributed import DistributedObject/AI/UD
+
+// Base distributed object class
+dclass DistributedObject {
+};
+
+// Simple test avatar
+dclass DistributedAvatar : DistributedObject {
+  setName(string name) broadcast ram;
+  setPosition(float32 x, float32 y, float32 z) broadcast ram;
+  setHealth(uint16 health) broadcast ram;
+  chat(string message) clsend airecv;
+};
+
+// Test database object
+dclass DistributedPlayer : DistributedObject {
+  setUsername(string username) required db;
+  setLevel(uint16 level) db ram;
+  setExperience(uint32 exp) db ram;
+};
+
+// UberDOG for testing
+dclass TestManager : DistributedObject {
+  login(string username, string password) clsend airecv;
+  loginResponse(uint8 success) airecv;
+};
+
