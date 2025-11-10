@@ -1,0 +1,12 @@
+## GNU Make/Linux Build Artifacts ##
+astrond
+*.[oa]
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+Makefile
+## Ignore Mac's directory info ##
+.DS_Store
+build/
+!build/.keep
