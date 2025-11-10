@@ -101,7 +101,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
 
-# Building Astron with debug logs #
+** Building Astron with debug logs **
 ```
 cd Astron/build-debug
 cmake -DCMAKE_BUILD_TYPE=Debug ..
@@ -109,8 +109,13 @@ make
 ```
 
 You should now have `astrond` in your builds folder.
+
 Both release and debug use the same name `astrond`, so if you build debug first, we can just rename it!
-```mv astrond astrond-dbg```
+
+```
+mv astrond astrond-dbg
+```
+
 then you can build the release version.
 
 
