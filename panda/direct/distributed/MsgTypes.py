@@ -8,6 +8,21 @@ Generated from Astron's src/core/msgtypes.h and src/clientagent/ClientMessages.h
 """
 
 # ============================================================================
+# CHANNEL CONSTANTS (from types.h)
+# ============================================================================
+
+CONTROL_CHANNEL = 1
+CONTROL_ADD_CHANNEL = 9000
+CONTROL_REMOVE_CHANNEL = 9001
+CONTROL_ADD_RANGE = 9002
+CONTROL_REMOVE_RANGE = 9003
+CONTROL_ADD_POST_REMOVE = 9010
+CONTROL_CLEAR_POST_REMOVES = 9011
+CONTROL_SET_CON_NAME = 9012
+CONTROL_SET_CON_URL = 9013
+CONTROL_LOG_MESSAGE = 9014
+
+# ============================================================================
 # CLIENT MESSAGES (from ClientMessages.h)
 # ============================================================================
 
