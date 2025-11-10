@@ -124,17 +124,34 @@ void NetworkClient::defragment_input(std::unique_lock<std::mutex>& lock)
 {
     while(m_data_buf.size() > sizeof(dgsize_t)) {
         // Enough data to know the expected length of the datagram.
-        dgsize_t data_size = *reinterpret_cast<dgsize_t*>(&m_data_buf[0]);
+        dgsize_t data_size = *reinterpret_cast<dgsize_t*>(m_data_buf.data());
+        
+        // Validate datagram size to prevent malformed packets
+        if(data_size == 0) {
+            // Invalid datagram size - disconnect client
+            disconnect(UV_EPROTO, lock);
+            return;
+        }
+        
         if(m_data_buf.size() >= data_size + sizeof(dgsize_t)) {
-            size_t overread_size = (m_data_buf.size() - data_size - sizeof(dgsize_t));
-            DatagramPtr dg = Datagram::create(reinterpret_cast<const uint8_t*>(&m_data_buf[sizeof(dgsize_t)]), data_size);
-            if(0 < overread_size) {
-                // Splice leftover data to new m_data_buf based on expected datagram length.
-                m_data_buf = std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&m_data_buf[sizeof(dgsize_t) + data_size]),
-                                                  reinterpret_cast<uint8_t*>(&m_data_buf[sizeof(dgsize_t) + data_size + overread_size]));
+            size_t total_consumed = sizeof(dgsize_t) + data_size;
+            
+            // Bounds check before creating datagram
+            if(total_consumed > m_data_buf.size()) {
+                disconnect(UV_EPROTO, lock);
+                return;
+            }
+            
+            DatagramPtr dg = Datagram::create(m_data_buf.data() + sizeof(dgsize_t), data_size);
+            
+            size_t overread_size = m_data_buf.size() - total_consumed;
+            if(overread_size > 0) {
+                // Use iterators for safe vector construction
+                m_data_buf = std::vector<uint8_t>(m_data_buf.begin() + total_consumed,
+                                                  m_data_buf.end());
             } else {
                 // No overread, buffer is empty.
-                m_data_buf = std::vector<uint8_t>();
+                m_data_buf.clear();
             }
 
             lock.unlock();
