@@ -1,8 +1,14 @@
 # DISCLAIMER
 This repository is a work in progress.
-DO NOT USE in production as I have no clue what will work and what wont for your use case
 
-Until I do extensive testing on my local builds and verify it is 100% working, there will be not be a production build in this repository. But changes will be made regardless.
+I have done a bit of testing, and everything appears to work flawlessly.
+
+I have tested:
+- `debug mode`
+- `release mode`
+
+Threading still needs work, but it does allow connections to the server. Workers are a little conflicted and cause core dumps for the moment.
+
 
 Astron Project
 --------------
@@ -87,25 +93,34 @@ Now that we've gotten all of that out of the way, let's build Astron!
 git clone https://github.com/mghost99/Astron
 ```
 
-**cd into the `Astron` folder and then cd into the `build` folder.**
+**cd into the `Astron` folder and then cd into the `build` or `build-debug` folder.**
+**We'll use production in this example:**
 ```
 cd Astron/build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make
 ```
 
-**Build Astron (astrond)**
+# Building Astron with debug logs #
 ```
-cmake ..
-
+cd Astron/build-debug
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
 You should now have `astrond` in your builds folder.
+Both release and debug use the same name `astrond`, so if you build debug first, we can just rename it!
+```mv astrond astrond-dbg```
+then you can build the release version.
+
+
 Now let's make it read/write:
 ```
 chmod +x astrond
 ```
 
 Copy it wherever you need it, and we're basically done!
+
 
 For those who currently use the YAML database and want to use MongoDB instead,
 replace the following:
