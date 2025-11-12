@@ -1,37 +1,61 @@
 How to Build Astron
-------------------------
+====================
 
-### Getting a copy of the code ###
-Astron is available on GitHub through Git or Subversion cloning.
+## So you want to build Astron? Let's get started! ##
 
-On your machine clone with:
+Astron uses **CMake** as its cross-platform build system. Choose the guide for your platform below:
 
-    git clone https://github.com/Astron/Astron.git
+### Build Guides by Platform ###
 
-**OR**
+📋 **Linux**  
+→ [Linux Build Guide (Make)](linux-gnu-make.md)
 
-    svn checkout https://github.com/Astron/Astron
+🍎 **macOS**  
+→ [macOS Build Guide (Homebrew)](macos-homebrew.md)
 
+🪟 **Windows**  
+→ [Windows MinGW Build Guide](windows-mingw.md) - **Recommended** (no Visual Studio needed)  
+→ [Windows Visual Studio Build Guide](windows-visualstudio.md) - Alternative approach
 
+### What You'll Need ###
 
-### Dependencies ###
+All platforms require these minimum dependency versions:
 
- * libyaml-cpp 0.5+
- * libuv 1.23.0+
- * boost 1.55+
- * openssl 1.0.1+
+| Dependency   | Version  |
+|--------------|----------|
+| CMake        | 3.15+    |
+| C++ Compiler | C++20    |
+| Boost        | 1.55+    |
+| libuv        | 1.23.0+  |
+| yaml-cpp     | 0.5+     |
+| OpenSSL      | 1.0.1+   |
+| Bison & Flex | Any      |
 
-Get the boost library from http://www.boost.org/users/download/, or install from a package on linux.  Very old versions of the boost library may not work as there are dependencies on some features of boost::icl.
-In some environments, you may have to set the BOOST_ROOT or BOOSTROOT environment variable to the root of your compiled boost libraries.
+**For detailed dependency information:** See [dependencies.md](dependencies.md)
 
-You can get libyaml-cpp from https://github.com/jbeder/yaml-cpp/. This dependency should typically be compiled and placed directly underneath the Astron/dependencies folder. Alternatively, you can install it from a package.
+### Optional Database Backends ###
 
-Grab the libuv dependency from https://github.com/libuv/libuv or install from a package on linux.
+Astron includes a built-in **YAML database** (perfect for development). You can optionally add:
 
-Now that you have the dependencies you can build!
+- **PostgreSQL** (via SOCI)
+- **MySQL** (via SOCI)
+- **SQLite3** (via SOCI)
+- **MongoDB** (requires manual driver builds)
 
-We use CMAKE to handle cross-platform compiling.
-See the individual guides for the compiler you intend on using:
+Each platform guide includes instructions for installing optional database support.
 
- - Linux/Make : [instructions](linux-gnu-make.md)
- - Windows/VisualStudio : [instructions](windows-visualstudio.md)
+### Quick Links ###
+
+- **Getting a copy of the code:**
+  ```bash
+  git clone https://github.com/Astron/Astron.git
+  cd Astron
+  ```
+
+- **Dependencies reference:** [dependencies.md](dependencies.md)
+- **Configuration docs:** [../config/](../config/)
+- **Main README:** [../../README.md](../../README.md)
+
+---
+
+**Ready to build?** Pick your platform above and follow the step-by-step guide!
