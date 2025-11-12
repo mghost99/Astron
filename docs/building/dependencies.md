@@ -126,7 +126,6 @@ cd C:\vcpkg
 
 For manual installation or detailed instructions, see [windows-visualstudio.md](windows-visualstudio.md).
 
-## Manually Building MongoDB Drivers ##
 ## Building MongoDB Drivers ##
 
 MongoDB support requires building the MongoDB C and C++ drivers from source. **Build instructions are platform-specific** due to different toolchains, paths, and quirks.

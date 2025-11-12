@@ -649,16 +649,16 @@ cmake --build . --config Release
 ### Alternative: MinGW-w64 vs Visual Studio ###
 
 **When to use Visual Studio:**
-- ✅ You need MongoDB support (required for VS)
-- ✅ You want official Microsoft toolchain
-- ✅ You're comfortable with larger downloads
+- ✅ You prefer the native Microsoft MSVC toolchain
+- ✅ You're building GUI Windows applications with Visual Studio
+- ✅ You want full IDE integration for debugging
 - ✅ vcpkg makes dependency management automatic
 
 **When to use MinGW-w64:**
-- ✅ You only need YAML or PostgreSQL databases (no MongoDB)
 - ✅ You want faster setup with smaller downloads
-- ✅ You prefer Unix-like build tools
-- ✅ MSYS2's package manager is simpler for non-MongoDB dependencies
+- ✅ You prefer Unix-like build tools (GCC, Bash, Make/Ninja)
+- ✅ MSYS2's package manager handles most dependencies automatically
+- ✅ You're comfortable with command-line builds
 
 See the [MinGW-w64 guide](windows-mingw.md) for the alternative approach.
 
