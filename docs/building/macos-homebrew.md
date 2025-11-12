@@ -1,7 +1,7 @@
 Building with _Homebrew_ on macOS
 -----------------------------------
 
-**Last updated: 11/09/2025**
+**Last updated: 11/11/2025**
 *This guide uses Homebrew package manager for macOS*
 
 ### Overview ###

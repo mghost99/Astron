@@ -1,7 +1,7 @@
 Building with _Visual Studio_ on Windows
 ------------------------------------------
 
-**Last updated: 11/09/2025**
+**Last updated: 11/11/2025**
 
 ## Table of Contents ##
 

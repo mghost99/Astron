@@ -1,7 +1,7 @@
 Astron Dependencies
 ===================
 
-**Last updated: 11/09/2025**
+**Last updated: 11/11/2025**
 
 This document lists all dependencies required to build Astron across different platforms.
 All platforms use the same minimum dependency versions to ensure consistency.
