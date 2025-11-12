@@ -127,47 +127,23 @@ cd C:\vcpkg
 For manual installation or detailed instructions, see [windows-visualstudio.md](windows-visualstudio.md).
 
 ## Manually Building MongoDB Drivers ##
+## Building MongoDB Drivers ##
 
-If you want MongoDB support, you'll need to build the MongoDB C and C++ drivers from source.
-These instructions work on all platforms (Linux, macOS, and MSYS2 on Windows):
+MongoDB support requires building the MongoDB C and C++ drivers from source. **Build instructions are platform-specific** due to different toolchains, paths, and quirks.
 
-### mongo-c-driver 2.1.2 ###
+**For detailed MongoDB build instructions, see your platform-specific guide:**
 
-```bash
-wget https://github.com/mongodb/mongo-c-driver/releases/download/2.1.2/mongo-c-driver-2.1.2.tar.gz
-tar xzf mongo-c-driver-2.1.2.tar.gz
-cd mongo-c-driver-2.1.2
-mkdir cmake-build && cd cmake-build
-cmake ..
-make
-sudo make install  # or just "make install" on MSYS2
-```
+- **Linux:** See [linux-gnu-make.md](linux-gnu-make.md#building-mongodb-drivers-optional) - Section "Building MongoDB Drivers"
+- **macOS:** See [macos-homebrew.md](macos-homebrew.md#building-mongodb-drivers-optional) - Section "Building MongoDB Drivers"
+- **Windows (MinGW):** See [windows-mingw.md](windows-mingw.md#4-building-mongodb-drivers-optional) - Section 4: Building MongoDB Drivers
+  - **Important:** Windows MinGW requires special flags and DLL considerations
+- **Windows (Visual Studio):** See [windows-visualstudio.md](windows-visualstudio.md) - Use vcpkg: `vcpkg install mongo-cxx-driver:x64-windows`
 
-### mongo-cxx-driver (stable) ###
-
-```bash
-git clone -b releases/stable https://github.com/mongodb/mongo-cxx-driver.git
-cd mongo-cxx-driver/build
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_RPATH=/usr/local/lib
-sudo make
-sudo make install  # or just "make install" on MSYS2
-```
-
-**Note for macOS:** Use `/usr/local` for the install prefix
-**Note for MSYS2:** Use `/mingw64` for the install prefix and omit `sudo`
-
-### libmongocrypt (Optional) ###
-
-```bash
-git clone https://github.com/mongodb/libmongocrypt
-cd libmongocrypt
-mkdir cmake-build && cd cmake-build
-cmake ../ -DBUILD_VERSION=1.0.0
-make
-sudo make install  # or just "make install" on MSYS2
-```
-
-**Note:** The `-DBUILD_VERSION=1.0.0` flag is required because the build script may fail to auto-detect the version from git.
+**Why platform-specific?** Each platform has different:
+- Installation prefixes (`/usr/local`, `/mingw64`, `C:/vcpkg`, etc.)
+- Static vs. shared library requirements (MinGW needs special handling)
+- CMake flags and toolchain configurations
+- System-specific workarounds (e.g., MinGW Decimal128 compatibility)
 
 ## Build System ##
 
