@@ -10,6 +10,7 @@ Makefile
 .DS_Store
 build/*
 build-debug/*
+built/*
 !build/.keep
 *.pyc
 panda/direct/distributed/__init__.py

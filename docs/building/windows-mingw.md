@@ -1,7 +1,7 @@
 Building with _MinGW-w64_ on Windows
 --------------------------------------
 
-**Last updated: 11/11/2025**
+**Last updated: 11/12/2025**
 *This guide uses MSYS2 with MinGW-w64 (no Visual Studio required)*
 
 ### Overview ###
@@ -339,29 +339,41 @@ Replace `test` with whatever your database is called. This will allow remote Mon
 
 ### Common Build Options ###
 
-Astron supports several CMake options. Here's a full example with all options:
+Astron supports several CMake options. Here's a full example with **all database backends** enabled:
 
 ```bash
 cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
-    -DSOCI_INCLUDE_DIR=/mingw64/include \
+    -DSOCI_INCLUDE_DIR=/mingw64/include/soci \
+    -DSOCI_INCLUDE_DIRS=/mingw64/include/soci \
     -DSOCI_LIBRARY=/mingw64/lib/libsoci_core_4_1.dll.a \
     -DSOCI_LIBRARY_DIR=/mingw64/lib \
     -DSOCI_postgresql_PLUGIN=/mingw64/lib/libsoci_postgresql_4_1.dll.a \
     -DSOCI_mysql_PLUGIN=/mingw64/lib/libsoci_mysql_4_1.dll.a \
     -DSOCI_sqlite3_PLUGIN=/mingw64/lib/libsoci_sqlite3_4_1.dll.a \
     -DLIBMONGOCXX_INCLUDE_DIRS=/mingw64/include/mongocxx/v_noabi \
-    -DLIBMONGOCXX_LIBRARIES=/mingw64/lib/libmongocxx-static.a \
+    -DLIBMONGOCXX_LIBRARIES="C:/msys64/mingw64/lib/libmongocxx-static.a;C:/msys64/mingw64/lib/libmongoc2.a;C:/msys64/mingw64/lib/libmongocrypt.dll.a" \
     -DLIBBSONCXX_INCLUDE_DIRS=/mingw64/include/bsoncxx/v_noabi \
-    -DLIBBSONCXX_LIBRARIES=/mingw64/lib/libbsoncxx-static.a \
-    -DUSE_32BIT_DATAGRAMS=OFF \
-    -DUSE_128BIT_CHANNELS=OFF \
-    -DBUILD_TESTS=OFF \
-    -DBUILD_DBSERVER=ON \
-    -DBUILD_DB_YAML=ON \
-    -DBUILD_STATESERVER=ON \
-    -DBUILD_EVENTLOGGER=ON \
-    -DBUILD_CLIENTAGENT=ON \
+    -DLIBBSONCXX_LIBRARIES="C:/msys64/mingw64/lib/libbsoncxx-static.a;C:/msys64/mingw64/lib/libbson2.a" \
     ..
+
+ninja
+```
+
+**Note:** Use Unix-style paths (`/mingw64/...`) for include directories, but Windows-style paths (`C:/msys64/mingw64/...`) for library files in semicolon-separated lists.
+
+**System libraries (automatically included):** The CMakeLists.txt automatically adds Windows system libraries needed by MongoDB: `dnsapi`, `bcrypt`, `ncrypt`, `secur32`, `crypt32`, `snappy`, `zstd`. You don't need to specify these manually.
+
+**For YAML-only (no SQL, no MongoDB):**
+
+```bash
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_DB_POSTGRESQL=OFF \
+    -DBUILD_DB_MYSQL=OFF \
+    -DBUILD_DB_SQLITE=OFF \
+    -DBUILD_DB_MONGO=OFF \
+    ..
+
+ninja
 ```
 
 **Available Options:**
@@ -406,14 +418,21 @@ ls /mingw64/lib/libsoci*
 **Verify MongoDB is installed:**
 
 ```bash
-ls /mingw64/lib/libmongocxx* /mingw64/lib/libbsoncxx*
-# Should show: libmongocxx-static.a, libbsoncxx-static.a
+ls /mingw64/lib/libmongocxx* /mingw64/lib/libbsoncxx* /mingw64/lib/libmongoc* /mingw64/lib/libbson*
+# Should show: libmongocxx-static.a, libbsoncxx-static.a, libmongoc2.a, libbson2.a, libmongocrypt.dll.a
 
 ls /mingw64/include/mongocxx/v_noabi/ /mingw64/include/bsoncxx/v_noabi/
 # Should show header files
 ```
 
-**The MongoDB paths are already included in the build commands above.** Make sure you built mongo-cxx-driver with `-DBUILD_SHARED_LIBS=OFF` to create the static libraries (named with `-static` suffix).
+**The MongoDB paths are already included in the build commands above.** 
+
+**Important:** The full MongoDB dependency chain is:
+- C++ driver: `libmongocxx-static.a` + `libbsoncxx-static.a`
+- C driver: `libmongoc2.a` + `libbson2.a`  
+- Encryption: `libmongocrypt.dll.a` (DLL version, not `-static`)
+
+**Note:** We use the DLL version of libmongocrypt (`libmongocrypt.dll.a`) because the static version has DLL exports and won't link properly with MinGW. Similarly, yaml-cpp uses the DLL version automatically.
 
 #### Building without database backends ####
 
