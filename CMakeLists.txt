@@ -93,6 +93,14 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3 -O0 -DASTRON_DEBUG_MESSA
 ### OS Specific Settings ###
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")	### Windows requires winsock
 	list(APPEND EXTRA_LIBS wsock32 ws2_32)
+	# Windows system libraries required by MongoDB C driver
+	list(APPEND EXTRA_LIBS dnsapi bcrypt ncrypt secur32 crypt32)
+	# Compression libraries required by MongoDB C driver
+	list(APPEND EXTRA_LIBS snappy zstd)
+	# Fix for weak symbol multiple definitions with MinGW static libraries (MongoDB)
+	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+	endif()
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")		### Linux requires pthreads
@@ -100,7 +108,12 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")		### Linux requires pthreads
 endif()
 
 ### YAML Depedency -- required by config, used by yaml database ###
-set(YAMLCPP_USE_STATIC_LIBS ON CACHE BOOL "If true, will try to find static YamlCpp first instead of dynamic.")
+# Note: On Windows MinGW, use DLL version due to static lib having DLL exports
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+	set(YAMLCPP_USE_STATIC_LIBS OFF CACHE BOOL "If true, will try to find static YamlCpp first instead of dynamic.")
+else()
+	set(YAMLCPP_USE_STATIC_LIBS ON CACHE BOOL "If true, will try to find static YamlCpp first instead of dynamic.")
+endif()
 find_package(YamlCpp REQUIRED)
 include_directories(${YAMLCPP_INCLUDE_DIR})
 link_directories(${YAMLCPP_LIBRARY_DIR})
@@ -282,12 +295,15 @@ if(BUILD_DBSERVER)
 			add_definitions(-DBUILD_DB_SQL)
 			include_directories(${SOCI_INCLUDE_DIRS})
 			link_directories(${SOCI_LIBRARY_DIR})
-			set(DBSERVER_FILES
-				${DBSERVER_FILES}
-				src/database/SociSQLDatabase.cpp
-			)
+		set(DBSERVER_FILES
+			${DBSERVER_FILES}
+			src/database/SociSQLDatabase.cpp
+		)
 
-			list(APPEND DB_LIBRARY_NAMES soci_core dl)
+			list(APPEND DB_LIBRARY_NAMES ${SOCI_LIBRARY})
+			if(NOT WIN32)
+				list(APPEND DB_LIBRARY_NAMES dl)
+			endif()
 			if(BUILD_DB_POSTGRESQL)
 			list(APPEND DB_LIBRARY_NAMES pq)
 			add_test(db_pgsql 
@@ -492,6 +508,29 @@ target_link_libraries(astrond
     ${LIBUV_LIBRARY}
     ${EXTRA_LIBS}
 )
+
+# Copy runtime DLLs and executable to built/ folder on Windows MinGW builds
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+	add_custom_command(TARGET astrond POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E echo "Creating built/ folder for standalone distribution..."
+		COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/built"
+		# Copy astrond.exe
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:astrond>" "${CMAKE_SOURCE_DIR}/built/"
+		# Core MinGW runtime DLLs
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libgcc_s_seh-1.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libwinpthread-1.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libstdc++-6.dll" "${CMAKE_SOURCE_DIR}/built/"
+		# Dependency DLLs
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libyaml-cpp.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libuv-1.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libsoci_core_4_1.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libsnappy.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libzstd.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libmongocrypt.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E echo "Portable build created in: ${CMAKE_SOURCE_DIR}/built/"
+		COMMENT "Creating standalone distribution in built/ folder"
+	)
+endif()
 
 install(TARGETS astrond DESTINATION bin)
 

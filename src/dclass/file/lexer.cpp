@@ -1,6 +1,6 @@
-#line 2 "lexer.cpp"
+#line 1 "lexer.cpp"
 
-#line 4 "lexer.cpp"
+#line 3 "lexer.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -958,8 +958,8 @@ char *yytext;
 		col_number += yyleng;
 	}
 
+#line 961 "lexer.cpp"
 #line 962 "lexer.cpp"
-#line 963 "lexer.cpp"
 
 #define INITIAL 0
 
@@ -1187,7 +1187,7 @@ YY_DECL
 	}
 
 
-#line 1191 "lexer.cpp"
+#line 1190 "lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1563,7 +1563,7 @@ YY_RULE_SETUP
 #line 688 "lexer.lpp"
 ECHO;
 	YY_BREAK
-#line 1567 "lexer.cpp"
+#line 1566 "lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 

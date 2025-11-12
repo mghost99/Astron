@@ -53,8 +53,10 @@ add_library(dclass
 	value/default.cpp
 )
 
-# Link flex library
-target_link_libraries(dclass PRIVATE fl)
+# Link flex library (not needed on Windows/MinGW)
+if(NOT WIN32)
+	target_link_libraries(dclass PRIVATE fl)
+endif()
 
 # Set include directories for the target
 target_include_directories(dclass PUBLIC 
