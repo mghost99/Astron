@@ -9,6 +9,7 @@
 
 #include "core/global.h"
 #include "config/ConfigVariable.h"
+#include "util/NetContext.h"
 
 namespace {
 inline boost::system::error_code make_err(boost::asio::error::basic_errors err)
