@@ -5,7 +5,7 @@
 #include "net/NetworkClient.h"
 #include "core/global.h"
 #include "core/msgtypes.h"
-#include "config/constraints.h"
+#include "config/ConfigSection.h"
 #include "dclass/dc/Class.h"
 #include "dclass/dc/Field.h"
 #include "util/Timeout.h"
@@ -14,28 +14,6 @@ using namespace std;
 using dclass::Class;
 using dclass::Field;
 
-
-static ConfigGroup astronclient_config("libastron", ca_client_config);
-static ConfigVariable<bool> relocate_owned("relocate", false, astronclient_config);
-static ConfigVariable<string> interest_permissions("add_interest", "visible", astronclient_config);
-static BooleanValueConstraint relocate_is_boolean(relocate_owned);
-
-static ConfigVariable<bool> send_hash_to_client("send_hash", true, astronclient_config);
-static ConfigVariable<bool> send_version_to_client("send_version", true, astronclient_config);
-
-static ConfigVariable<uint64_t> write_buffer_size("write_buffer_size", 256 * 1024,
-        astronclient_config);
-static ConfigVariable<unsigned int> write_timeout_ms("write_timeout_ms", 5000, astronclient_config);
-
-//by default, have heartbeat disabled.
-static ConfigVariable<long> heartbeat_timeout_config("heartbeat_timeout", 0, astronclient_config);
-
-static bool is_permission_level(const string& str)
-{
-    return (str == "visible" || str == "disabled" || str == "enabled");
-}
-static ConfigConstraint<string> valid_permission_level(is_permission_level, interest_permissions,
-        "Permissions for add_interest must be one of 'visible', 'enabled', 'disabled'.");
 
 enum InterestPermission {
     INTERESTS_ENABLED,
@@ -47,11 +25,13 @@ class AstronClient : public Client, public NetworkHandler
 {
   private:
     std::shared_ptr<NetworkClient> m_client;
-    ConfigNode m_config;
+    ConfigSection m_config;
     bool m_clean_disconnect;
     bool m_relocate_owned;
     bool m_send_hash;
     bool m_send_version;
+    uint64_t m_write_buffer;
+    unsigned int m_write_timeout_ms;
     InterestPermission m_interests_allowed;
 
     //Heartbeat
@@ -59,14 +39,19 @@ class AstronClient : public Client, public NetworkHandler
     Timeout* m_heartbeat_timer = nullptr;
 
   public:
-    AstronClient(ConfigNode config, ClientAgent* client_agent, const std::shared_ptr<uvw::TcpHandle> &socket,
-                 const uvw::Addr &remote, const uvw::Addr &local, const bool haproxy_mode) :
+    AstronClient(const ConfigSection &config, ClientAgent* client_agent, const TcpSocketPtr &socket,
+                 const NetAddress &remote, const NetAddress &local, const bool haproxy_mode) :
         Client(config, client_agent), m_client(std::make_shared<NetworkClient>(this)),
         m_config(config),
-        m_clean_disconnect(false), m_relocate_owned(relocate_owned.get_rval(config)),
-        m_send_hash(send_hash_to_client.get_rval(config)),
-        m_send_version(send_version_to_client.get_rval(config)),
-        m_heartbeat_timeout(heartbeat_timeout_config.get_rval(config))
+        m_clean_disconnect(false),
+        m_relocate_owned(config.get_or<bool>("relocate", false)),
+        m_send_hash(config.get_optional<bool>("send_hash").value_or(
+            config.get_or<bool>("send_hash_to_client", true))),
+        m_send_version(config.get_optional<bool>("send_version_to_client").value_or(
+            config.get_or<bool>("send_version_to_client", true))),
+        m_write_buffer(config.get_or<uint64_t>("write_buffer_size", 256 * 1024ULL)),
+        m_write_timeout_ms(config.get_or<unsigned int>("write_timeout_ms", 5000)),
+        m_heartbeat_timeout(config.get_or<long>("heartbeat_timeout", 0))
     {
         pre_initialize();
 
@@ -76,18 +61,22 @@ class AstronClient : public Client, public NetworkHandler
     inline void pre_initialize()
     {
         // Set interest permissions
-        string permission_level = interest_permissions.get_rval(m_config);
+        string permission_level = m_config.get_or<std::string>("add_interest", "visible");
         if(permission_level == "enabled") {
             m_interests_allowed = INTERESTS_ENABLED;
         } else if(permission_level == "visible") {
             m_interests_allowed = INTERESTS_VISIBLE;
-        } else {
+        } else if(permission_level == "disabled") {
             m_interests_allowed = INTERESTS_DISABLED;
+        } else {
+            m_log->warning() << "Unknown add_interest value '" << permission_level
+                             << "', defaulting to 'visible'.\n";
+            m_interests_allowed = INTERESTS_VISIBLE;
         }
 
         // Set NetworkClient configuration.
-        m_client->set_write_timeout(write_timeout_ms.get_rval(m_config));
-        m_client->set_write_buffer(write_buffer_size.get_rval(m_config));
+        m_client->set_write_timeout(m_write_timeout_ms);
+        m_client->set_write_buffer(m_write_buffer);
     }
 
     void heartbeat_timeout()
@@ -204,7 +193,7 @@ class AstronClient : public Client, public NetworkHandler
     //     connection or otherwise when the tcp connection is lost.
     // Note: In the Astron client protocol, the server is normally
     //       responsible for terminating the connection.
-    virtual void receive_disconnect(const uvw::ErrorEvent &evt)
+    virtual void receive_disconnect(const NetErrorEvent &evt)
     {
         lock_guard<recursive_mutex> lock(m_client_lock);
 
@@ -221,7 +210,7 @@ class AstronClient : public Client, public NetworkHandler
             ss << m_client->get_local().ip
                << ":" << m_client->get_local().port;
             event.add("local_address", ss.str());
-            event.add("reason", evt.what());
+            event.add("reason", evt.message());
             log_event(event);
         }
 
@@ -401,15 +390,17 @@ class AstronClient : public Client, public NetworkHandler
             return;
         }
 
-        const static uint32_t expected_hash = m_client_agent->get_hash();
+        const uint32_t expected_hash = m_client_agent->get_hash();
         if(dc_hash != expected_hash) {
             stringstream ss;
             ss << "Client DC hash mismatch: client=0x" << hex << dc_hash;
             if(m_send_hash) {
                 ss << ", server=0x" << expected_hash;
+                send_disconnect(CLIENT_DISCONNECT_BAD_DCHASH, ss.str());
+                return;
+            } else {
+                m_log->warning() << ss.str() << " (override enabled); allowing connection.\n";
             }
-            send_disconnect(CLIENT_DISCONNECT_BAD_DCHASH, ss.str());
-            return;
         }
 
         DatagramPtr resp = Datagram::create();

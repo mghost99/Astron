@@ -5,6 +5,7 @@
 #include "config/constraints.h"
 #include "EventLogger.h"
 #include "util/EventSender.h"
+#include "util/NetContext.h"
 
 #include "msgpack_decode.h"
 
@@ -29,11 +30,10 @@ EventLogger::EventLogger(RoleConfig roleconfig) : Role(roleconfig),
 
 void EventLogger::bind(const std::string &addr)
 {
-    // We have to make sure our bind happens within the context of the main thread.
     assert(std::this_thread::get_id() == g_main_thread_id);
 
     m_log.info() << "Opening UDP socket..." << std::endl;
-    auto addresses = resolve_address(addr, 7197, g_loop);
+    auto addresses = resolve_address(addr, 7197);
 
     if(addresses.size() == 0) {
         m_log.fatal() << "Failed to bind to EventLogger address " << addr << "\n";
@@ -42,8 +42,28 @@ void EventLogger::bind(const std::string &addr)
 
     m_local = addresses.front();
 
-    m_socket = g_loop->resource<uvw::UDPHandle>();
-    m_socket->bind(m_local);
+    boost::system::error_code ec;
+    auto endpoint_address = boost::asio::ip::make_address(m_local.ip, ec);
+    if(ec) {
+        m_log.fatal() << "Failed to parse EventLogger address " << m_local.ip << ": " << ec.message() << "\n";
+        exit(1);
+    }
+
+    auto &io = NetContext::instance().context();
+    m_socket = std::make_shared<boost::asio::ip::udp::socket>(io);
+    boost::asio::ip::udp::endpoint endpoint(endpoint_address, m_local.port);
+    m_socket->open(endpoint.protocol(), ec);
+    if(ec) {
+        m_log.fatal() << "Failed to open UDP socket for EventLogger: " << ec.message() << "\n";
+        exit(1);
+    }
+
+    m_socket->bind(endpoint, ec);
+    if(ec) {
+        m_log.fatal() << "Failed to bind UDP socket for EventLogger: " << ec.message() << "\n";
+        exit(1);
+    }
+
     start_receive();
 }
 
@@ -74,7 +94,7 @@ void EventLogger::cycle_log()
     process_packet(event.make_datagram(), m_local);
 }
 
-void EventLogger::process_packet(DatagramHandle dg, const uvw::Addr& sender)
+void EventLogger::process_packet(DatagramHandle dg, const NetAddress& sender)
 {
     DatagramIterator dgi(dg);
     std::stringstream stream;
@@ -119,15 +139,30 @@ void EventLogger::process_packet(DatagramHandle dg, const uvw::Addr& sender)
 
 void EventLogger::start_receive()
 {
-    m_socket->on<uvw::UDPDataEvent>([this](const uvw::UDPDataEvent &event, uvw::UDPHandle &) {
-        m_log.trace() << "Got packet from " << event.sender.ip
-                      << ":" << event.sender.port << ".\n";
+    if(!m_socket) {
+        return;
+    }
 
-        DatagramPtr dg = Datagram::create(reinterpret_cast<const uint8_t*>(event.data.get()), event.length);
-        process_packet(dg, event.sender);
-    });
+    auto buffer = std::make_shared<std::vector<uint8_t>>(65536);
+    auto sender_endpoint = std::make_shared<boost::asio::ip::udp::endpoint>();
 
-    m_socket->recv();
+    m_socket->async_receive_from(boost::asio::buffer(*buffer), *sender_endpoint,
+        [this, buffer, sender_endpoint](const boost::system::error_code &ec, std::size_t bytes) {
+            if(!ec && bytes > 0) {
+                m_log.trace() << "Got packet from " << sender_endpoint->address().to_string()
+                              << ":" << sender_endpoint->port() << ".\n";
+
+                DatagramPtr dg = Datagram::create(buffer->data(), bytes);
+                NetAddress sender;
+                sender.ip = sender_endpoint->address().to_string();
+                sender.port = sender_endpoint->port();
+                process_packet(dg, sender);
+            } else if(ec && ec != boost::asio::error::operation_aborted) {
+                m_log.warning() << "EventLogger receive error: " << ec.message() << std::endl;
+            }
+
+            start_receive();
+        });
 }
 
 static RoleFactoryItem<EventLogger> el_fact("eventlogger");

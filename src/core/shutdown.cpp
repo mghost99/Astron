@@ -15,6 +15,7 @@
 using namespace std;
 
 #include "global.h"
+#include "util/NetContext.h"
 
 
 const static int MAX_INTERRUPTS = 3;
@@ -79,6 +80,8 @@ void astron_shutdown(int code, bool throw_exception)
     exit_mtx.lock();
     /*log->info()*/
     cerr << "Exiting...\n";
+    NetContext::instance().stop();
+    NetContext::instance().join();
     exit_code = code;
     if(throw_exception) {
         throw ShutdownException(code);

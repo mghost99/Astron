@@ -138,6 +138,7 @@ find_package(Boost REQUIRED CONFIG)
 if(Boost_FOUND)
 	include_directories(${Boost_INCLUDE_DIRS})
 endif()
+add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
 
 set(USE_32BIT_DATAGRAMS OFF CACHE BOOL
 	"If on, datagrams and dclass fields will use 32-bit length tags instead of 16-bit.")
@@ -426,6 +427,11 @@ set(UTIL_FILES
 	src/util/DatagramIterator.h
 	src/util/EventSender.cpp
 	src/util/EventSender.h
+	src/config/ConfigSchema.cpp
+	src/config/ConfigValidator.cpp
+	src/config/ConfigSection.cpp
+	src/util/NetContext.cpp
+	src/util/NetContext.h
 	src/util/Timeout.cpp
 	src/util/Timeout.h
 	src/util/TaskQueue.cpp

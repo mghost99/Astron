@@ -45,7 +45,16 @@ void StateServer::handle_generate(DatagramIterator &dgi, bool has_other)
     // Make sure the class exists in the file
     const Class *dc_class = g_dcf->get_class_by_id(dc_id);
     if(!dc_class) {
-        m_log->error() << "Received create for unknown dclass with class id '" << dc_id << "'\n";
+        std::string name_hint;
+        if(dc_id < g_dcf->get_num_classes()) {
+            auto hint = g_dcf->get_class(dc_id);
+            name_hint = hint ? hint->get_name() : "<null entry>";
+        } else {
+            name_hint = "<out-of-range>";
+        }
+        m_log->error() << "Received create for unknown dclass id '" << dc_id
+                       << "' (hint=" << name_hint
+                       << ", total_known=" << g_dcf->get_num_classes() << ").\n";
         return;
     }
 

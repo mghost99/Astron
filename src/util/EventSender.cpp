@@ -1,10 +1,15 @@
-#include "core/global.h"
-
 #include "EventSender.h"
+
+#include <boost/asio/ip/address.hpp>
+#include <boost/system/error_code.hpp>
+
+#include "core/global.h"
 #include "net/address_utils.h"
+#include "util/NetContext.h"
+#include "util/TaskQueue.h"
 
 EventSender::EventSender() : m_log("eventsender", "Event Sender"),
-    m_loop(nullptr), m_socket(nullptr), m_enabled(false)
+    m_socket(nullptr), m_enabled(false)
 {
 }
 
@@ -16,18 +21,32 @@ void EventSender::init(const std::string& target)
         return;
     }
 
-    m_loop = g_loop;
-    m_socket = g_loop->resource<uvw::UDPHandle>();
-
     m_log.debug() << "Resolving target..." << std::endl;
-    auto addresses = resolve_address(target, 7197, m_loop);
+    auto addresses = resolve_address(target, 7197);
 
     if(addresses.size() == 0) {
         m_log.fatal() << "Failed to resolve target address " << target << " for EventSender.\n";
         exit(1);
     }
 
-    m_target = addresses.front();
+    const auto &addr = addresses.front();
+    boost::system::error_code ec;
+    auto endpoint_address = boost::asio::ip::make_address(addr.ip, ec);
+    if(ec) {
+        m_log.fatal() << "Failed to parse resolved address " << addr.ip << " for EventSender: "
+                      << ec.message() << "\n";
+        exit(1);
+    }
+
+    auto &io = NetContext::instance().context();
+    m_socket = std::make_shared<boost::asio::ip::udp::socket>(io);
+    m_socket->open(endpoint_address.is_v4() ? boost::asio::ip::udp::v4() : boost::asio::ip::udp::v6(), ec);
+    if(ec) {
+        m_log.fatal() << "Failed to open UDP socket for EventSender: " << ec.message() << "\n";
+        exit(1);
+    }
+
+    m_target = boost::asio::ip::udp::endpoint(endpoint_address, addr.port);
     m_enabled = true;
 
     m_log.debug() << "Initialized." << std::endl;
@@ -41,7 +60,23 @@ void EventSender::send(DatagramHandle dg)
     }
 
     m_log.trace() << "Sending event..." << std::endl;
-    m_socket->trySend(m_target, (char*) dg->get_data(), dg->size());
+
+    auto socket = m_socket;
+    auto endpoint = m_target;
+    auto payload = std::make_shared<std::vector<uint8_t>>(dg->get_data(), dg->get_data() + dg->size());
+    auto self = this;
+
+    TaskQueue::singleton.enqueue_task([socket, endpoint, payload, self]() mutable {
+        if(!socket) {
+            return;
+        }
+
+        boost::system::error_code ec;
+        socket->send_to(boost::asio::buffer(*payload), endpoint, 0, ec);
+        if(ec) {
+            self->m_log.warning() << "EventSender send failed: " << ec.message() << std::endl;
+        }
+    });
 }
 
 // And now the convenience class:

@@ -23,9 +23,88 @@
 
 #include <limits>
 #include <list>
+#include <sstream>
+#include <algorithm>
+#include <iomanip>
 
 using namespace std;
 using namespace bsoncxx::builder::stream;
+
+namespace
+{
+bool debug_logs_enabled()
+{
+    return g_logger && g_logger->get_min_severity() <= LSEVERITY_DEBUG;
+}
+
+void log_fixed_string_bytes(const std::string &field_name,
+                            size_t fixed_len,
+                            size_t value_len,
+                            const std::vector<uint8_t> &buffer)
+{
+    if(!debug_logs_enabled()) {
+        return;
+    }
+    auto out = g_logger->log(LSEVERITY_INFO);
+    out << "[db-debug] bson2bamboo field=" << field_name
+        << " fixed_len=" << fixed_len
+        << " value_len=" << value_len
+        << " bytes=";
+    out << std::hex << std::setfill('0');
+    size_t dump = std::min<size_t>(buffer.size(), 32);
+    for(size_t i = 0; i < dump; ++i) {
+        out << std::setw(2) << static_cast<unsigned>(buffer[i]) << ' ';
+    }
+    out << std::dec << "\n";
+}
+
+const char *operation_name(DBOperation::OperationType type)
+{
+    switch(type) {
+        case DBOperation::CREATE_OBJECT: return "CREATE_OBJECT";
+        case DBOperation::DELETE_OBJECT: return "DELETE_OBJECT";
+        case DBOperation::GET_OBJECT: return "GET_OBJECT";
+        case DBOperation::GET_FIELDS: return "GET_FIELDS";
+        case DBOperation::SET_FIELDS: return "SET_FIELDS";
+        case DBOperation::UPDATE_FIELDS: return "UPDATE_FIELDS";
+        default: return "UNKNOWN";
+    }
+}
+
+std::string describe_field_values(const FieldValues &fields)
+{
+    if(fields.empty()) {
+        return "<none>";
+    }
+    std::ostringstream oss;
+    bool first = true;
+    for(const auto &entry : fields) {
+        if(!first) {
+            oss << ", ";
+        }
+        first = false;
+        oss << entry.first->get_name() << "(bytes=" << entry.second.size() << ")";
+    }
+    return oss.str();
+}
+
+std::string describe_field_set(const FieldSet &fields)
+{
+    if(fields.empty()) {
+        return "<none>";
+    }
+    std::ostringstream oss;
+    bool first = true;
+    for(const auto &field : fields) {
+        if(!first) {
+            oss << ", ";
+        }
+        first = false;
+        oss << field->get_name();
+    }
+    return oss.str();
+}
+} // namespace
 
 static ConfigGroup mongodb_backend_config("mongodb", db_backend_config);
 static ConfigVariable<string> db_server("server", "mongodb://127.0.0.1/test",
@@ -346,7 +425,17 @@ static void bson2bamboo(const dclass::DistributedType *type,
                 throw ConversionException("Expected string");
             }
             string str = string(value.get_string().value);
-            dg.add_data(str);
+            size_t fixed_len = type->get_size();
+            if(fixed_len == 0) {
+                dg.add_data(str);
+                break;
+            }
+            std::vector<uint8_t> buf(fixed_len, 0);
+            if(!str.empty()) {
+                std::memcpy(buf.data(), str.data(), std::min(str.size(), buf.size()));
+            }
+            log_fixed_string_bytes(field_name, fixed_len, str.size(), buf);
+            dg.add_data(buf.data(), buf.size());
         }
         break;
         case dclass::Type::T_VARSTRING: {
@@ -663,6 +752,12 @@ class MongoDatabase : public DatabaseBackend
 
     void handle_get(mongocxx::database &db, DBOperation *operation)
     {
+        if(debug_logs_enabled()) {
+            m_log->info() << "[db-debug] handle_get: op=" << operation_name(operation->type())
+                          << " doid=" << operation->doid()
+                          << " requested_fields=" << describe_field_set(operation->get_fields())
+                          << endl;
+        }
         bsoncxx::stdx::optional<bsoncxx::document::value> obj;
         try {
             obj = db["astron.objects"].find_one(document {}
@@ -677,10 +772,19 @@ class MongoDatabase : public DatabaseBackend
         }
 
         if(!obj) {
+            if(debug_logs_enabled()) {
+                m_log->info() << "[db-debug] handle_get: query for DOID " << operation->doid()
+                              << " returned no document." << endl;
+            }
             m_log->warning() << "Got queried for non-existent object with DOID "
                              << operation->doid() << endl;
             operation->on_failure();
             return;
+        }
+
+        if(debug_logs_enabled()) {
+            m_log->info() << "[db-debug] handle_get: found document for DOID " << operation->doid()
+                          << ": " << bsoncxx::to_json(*obj) << endl;
         }
 
         DBObjectSnapshot *snap = format_snapshot(operation->doid(), *obj);
@@ -693,6 +797,13 @@ class MongoDatabase : public DatabaseBackend
 
     void handle_modify(mongocxx::database &db, DBOperation *operation)
     {
+        if(debug_logs_enabled()) {
+            m_log->info() << "[db-debug] handle_modify: op=" << operation_name(operation->type())
+                          << " doid=" << operation->doid()
+                          << " set_fields=" << describe_field_values(operation->set_fields())
+                          << " criteria_fields=" << describe_field_values(operation->criteria_fields())
+                          << endl;
+        }
         // Format the changes to be made:
         document sets_builder {};
         document unsets_builder {};
@@ -703,6 +814,7 @@ class MongoDatabase : public DatabaseBackend
                 unsets_builder << fieldname.str() << true;
             } else {
                 DatagramPtr dg = Datagram::create();
+
                 dg->add_data(it.second);
                 DatagramIterator dgi(dg);
                 bamboo2bson(sets_builder << fieldname.str(), it.first->get_type(), dgi);
@@ -733,9 +845,16 @@ class MongoDatabase : public DatabaseBackend
         }
         auto query_obj = query << finalize;
 
-        m_log->trace() << "Performing updates to " << operation->doid()
-                       << ": " << bsoncxx::to_json(updates) << endl;
-        m_log->trace() << "Query is: " << bsoncxx::to_json(query_obj) << endl;
+        if(debug_logs_enabled()) {
+            m_log->info() << "[db-debug] handle_modify: DOID " << operation->doid()
+                          << " updates: " << bsoncxx::to_json(updates) << endl;
+            m_log->info() << "[db-debug] handle_modify: DOID " << operation->doid()
+                          << " query: " << bsoncxx::to_json(query_obj) << endl;
+        } else {
+            m_log->trace() << "Performing updates to " << operation->doid()
+                           << ": " << bsoncxx::to_json(updates) << endl;
+            m_log->trace() << "Query is: " << bsoncxx::to_json(query_obj) << endl;
+        }
 
         bsoncxx::stdx::optional<bsoncxx::document::value> obj;
         try {
@@ -747,10 +866,20 @@ class MongoDatabase : public DatabaseBackend
             return;
         }
 
-        if(obj) {
-            m_log->trace() << "Update result: " << bsoncxx::to_json(*obj) << endl;
+        if(debug_logs_enabled()) {
+            if(obj) {
+                m_log->info() << "[db-debug] handle_modify: DOID " << operation->doid()
+                              << " update result: " << bsoncxx::to_json(*obj) << endl;
+            } else {
+                m_log->info() << "[db-debug] handle_modify: DOID " << operation->doid()
+                              << " update result: [no match]" << endl;
+            }
         } else {
-            m_log->trace() << "Update result: [server could not find a matching object]" << endl;
+            if(obj) {
+                m_log->trace() << "Update result: " << bsoncxx::to_json(*obj) << endl;
+            } else {
+                m_log->trace() << "Update result: [server could not find a matching object]" << endl;
+            }
         }
 
         if(!obj) {
@@ -865,7 +994,14 @@ class MongoDatabase : public DatabaseBackend
                 }
 
                 DatagramPtr dg = Datagram::create();
-                bson2bamboo(field->get_type(), field->get_name(), it.get_value(), *dg);
+                try {
+                    bson2bamboo(field->get_type(), field->get_name(), it.get_value(), *dg);
+                } catch(const ConversionException &e) {
+                    m_log->error() << "Conversion error while formatting " << dclass_name
+                                   << "(" << doid << ") field '" << field->get_name()
+                                   << "': " << e.what() << endl;
+                    throw;
+                }
                 snap->m_fields[field].resize(dg->size());
                 memcpy(snap->m_fields[field].data(), dg->get_data(), dg->size());
             }

@@ -6,7 +6,7 @@
 using namespace std;
 using dclass::Class;
 
-Client::Client(ConfigNode, ClientAgent* client_agent) :
+Client::Client(const ConfigSection &, ClientAgent* client_agent) :
     m_client_agent(client_agent)
 {
     assert(std::this_thread::get_id() == g_main_thread_id);

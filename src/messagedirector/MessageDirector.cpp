@@ -1,6 +1,8 @@
 #include "MessageDirector.h"
 #include <algorithm>
 #include <functional>
+#include <chrono>
+#include <boost/system/error_code.hpp>
 #include <boost/icl/interval_bounds.hpp>
 
 #include "core/global.h"
@@ -85,18 +87,13 @@ void MessageDirector::init_network()
             
             // Spawn thread pool
             for(size_t i = 0; i < m_num_threads; ++i) {
-                m_thread_pool.emplace_back([this, i]() {
-                    this->routing_thread(i);
+                m_thread_pool.emplace_back([this, i](std::stop_token stop_token) {
+                    this->routing_thread(stop_token, i);
                 });
             }
             
-            // Add periodic cleanup task to process terminated participants safely
-            // This ensures participants are only deleted from the main thread
-            m_cleanup_timer = g_loop->resource<uvw::TimerHandle>();
-            m_cleanup_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent&, uvw::TimerHandle&) {
-                this->process_terminates();
-            });
-            m_cleanup_timer->start(uvw::TimerHandle::Time{50}, uvw::TimerHandle::Time{50}); // Every 50ms
+            m_cleanup_timer = std::make_shared<boost::asio::steady_timer>(NetContext::instance().context());
+            schedule_cleanup();
         }
 
         m_initialized = true;
@@ -105,7 +102,7 @@ void MessageDirector::init_network()
 
 void MessageDirector::shutdown_threading()
 {
-    if(m_thread_pool.empty()) {
+    if(m_thread_pool.empty() && !m_cleanup_timer) {
         return;
     }
 
@@ -113,8 +110,18 @@ void MessageDirector::shutdown_threading()
     m_log.info() << "Shutting down thread pool..." << std::endl;
     m_shutdown.store(true, std::memory_order_release);
     
-    // C++20 jthread will auto-join on destruction, but we can explicitly clear
+    // Stop cleanup timer before we destroy any remaining objects
+    if(m_cleanup_timer) {
+        m_cleanup_timer->cancel();
+        m_cleanup_timer.reset();
+    }
+
+    // Request all worker threads to stop; jthread will join on destruction
+    for(auto &worker : m_thread_pool) {
+        worker.request_stop();
+    }
     m_thread_pool.clear();
+    m_shutdown.store(false, std::memory_order_release);
     
     m_log.info() << "Thread pool shutdown complete." << std::endl;
 }
@@ -172,11 +179,11 @@ void MessageDirector::flush_queue()
 }
 
 // Thread pool worker function - runs in parallel across multiple threads
-void MessageDirector::routing_thread(size_t thread_id)
+void MessageDirector::routing_thread(std::stop_token stop_token, size_t thread_id)
 {
     m_log.debug() << "Routing thread " << thread_id << " started" << std::endl;
     
-    while(!m_shutdown.load(std::memory_order_acquire)) {
+    while(!stop_token.stop_requested() && !m_shutdown.load(std::memory_order_acquire)) {
         MessagePair* msg;
         
         if(m_messages.pop(msg)) {
@@ -191,6 +198,23 @@ void MessageDirector::routing_thread(size_t thread_id)
     }
     
     m_log.debug() << "Routing thread " << thread_id << " exiting" << std::endl;
+}
+
+void MessageDirector::schedule_cleanup()
+{
+    if(!m_cleanup_timer) {
+        return;
+    }
+
+    m_cleanup_timer->expires_after(std::chrono::milliseconds(50));
+    auto timer = m_cleanup_timer;
+    timer->async_wait([this, timer](const boost::system::error_code &ec) {
+        if(ec || timer != m_cleanup_timer) {
+            return;
+        }
+        this->process_terminates();
+        schedule_cleanup();
+    });
 }
 
 void MessageDirector::process_datagram(MDParticipantInterface *p, DatagramHandle dg)
@@ -331,18 +355,29 @@ void MessageDirector::on_remove_range(channel_t lo, channel_t hi)
     }
 }
 
-void MessageDirector::handle_connection(const std::shared_ptr<uvw::TcpHandle> &socket)
+void MessageDirector::handle_connection(const TcpSocketPtr &socket)
 {
-    uvw::Addr remote = socket->peer();
+    if(!socket) {
+        return;
+    }
+
+    boost::system::error_code ec;
+    NetAddress remote;
+    auto endpoint = socket->remote_endpoint(ec);
+    if(!ec) {
+        remote = make_address(endpoint);
+    }
+
     m_log.info() << "Got an incoming connection from "
                  << remote.ip << ":" << remote.port << std::endl;
-    new MDNetworkParticipant(socket); // It deletes itself when connection is lost
+    new MDNetworkParticipant(socket); // Deletes itself when connection is lost
 }
 
-void MessageDirector::handle_error(const uvw::ErrorEvent& evt)
+void MessageDirector::handle_error(const NetErrorEvent& evt)
 {
-    if(evt.code() == UV_EADDRINUSE || evt.code() == UV_EADDRNOTAVAIL) {
-        m_log.fatal() << "Failed to bind to address: " << evt.what() << "\n";
+    if(evt.code() == static_cast<int>(boost::system::errc::address_in_use) ||
+       evt.code() == static_cast<int>(boost::system::errc::address_not_available)) {
+        m_log.fatal() << "Failed to bind to address: " << evt.message() << "\n";
         exit(1);
     }
 }
@@ -404,8 +439,8 @@ void MessageDirector::receive_datagram(DatagramHandle dg)
     route_datagram(nullptr, dg);
 }
 
-void MessageDirector::receive_disconnect(const uvw::ErrorEvent &evt)
+void MessageDirector::receive_disconnect(const NetErrorEvent &evt)
 {
-    m_log.fatal() << "Lost connection to upstream md: " << evt.what() << std::endl;
+    m_log.fatal() << "Lost connection to upstream md: " << evt.message() << std::endl;
     exit(1);
 }

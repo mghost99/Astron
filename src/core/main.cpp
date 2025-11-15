@@ -2,11 +2,16 @@
 #include "shutdown.h"
 #include "RoleFactory.h"
 #include "config/constraints.h"
+#include "config/ConfigValidator.h"
+#include "clientagent/ClientAgent.h"
+#include "util/NetContext.h"
 #include "dclass/file/read.h"
 #include "dclass/dc/Class.h"
 using dclass::Class;
 
 #include <cstring>
+#include <filesystem>
+#include <iomanip>
 #include <string>  // std::string
 #include <vector>  // std::vector
 #include <fstream> // std::ifstream
@@ -40,6 +45,9 @@ static void printCompiledOptions(ostream &s);
 int main(int argc, char *argv[])
 {
     string cfg_file;
+
+    // Ensure the network context is initialized; we'll wire it up in later stages.
+    NetContext::instance();
 
 #ifdef _WIN32
     bool prettyPrint = false;
@@ -134,7 +142,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    g_loop = uvw::Loop::getDefault();
     g_main_thread_id = std::this_thread::get_id();
 
     g_logger->set_color_enabled(prettyPrint);
@@ -192,6 +199,17 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    ConfigValidator schema_validator(g_config->copy_node());
+    schema_validator.register_schema(ClientAgent::schema());
+    std::vector<std::string> schema_errors;
+    if(!schema_validator.validate(schema_errors)) {
+        for(const auto &err : schema_errors) {
+            mainlog.error() << err << "\n";
+        }
+        mainlog.fatal() << "Configuration file contains schema errors.\n";
+        return 1;
+    }
+
     dclass::File* dcf = new dclass::File();
     dcf->add_keyword("required");
     dcf->add_keyword("ram");
@@ -204,11 +222,43 @@ int main(int argc, char *argv[])
     dcf->add_keyword("airecv");
     vector<string> dc_file_names = dc_files.get_val();
     for(auto it = dc_file_names.begin(); it != dc_file_names.end(); ++it) {
+        std::filesystem::path dc_path = std::filesystem::absolute(*it);
+        auto prev_classes = dcf->get_num_classes();
+        auto prev_structs = dcf->get_num_structs();
+        bool readable = fs::file_exists(*it) && fs::is_readable(*it);
+        mainlog.info() << "Loading DC file '" << dc_path.string() << "'..."
+                       << (readable ? "" : " (warning: path not readable!)") << std::endl;
         bool ok = dclass::append(dcf, *it);
         if(!ok) {
             mainlog.fatal() << "Could not read DC file " << *it << endl;
             return 1;
         }
+        mainlog.info() << "Loaded '" << dc_path.string() << "' (+"
+                       << (dcf->get_num_classes() - prev_classes) << " classes, +"
+                       << (dcf->get_num_structs() - prev_structs) << " structs; totals now "
+                       << dcf->get_num_classes() << " classes/"
+                       << dcf->get_num_structs() << " structs)." << std::endl;
+    }
+    mainlog.info() << "DC catalogue complete: classes=" << dcf->get_num_classes()
+                   << ", structs=" << dcf->get_num_structs()
+                   << ", legacy_hash=0x" << dclass::legacy_hash(dcf) << std::dec << "."
+                   << std::endl;
+    if(dcf->get_num_classes() > 0) {
+        const auto *first = dcf->get_class(0);
+        std::string first_name = first ? first->get_name() : "<unknown>";
+        std::string last_name;
+        if(dcf->get_num_classes() > 1) {
+            if(const auto *last = dcf->get_class(dcf->get_num_classes() - 1)) {
+                last_name = last->get_name();
+            } else {
+                last_name = "<unknown>";
+            }
+        } else {
+            last_name = first_name;
+        }
+        mainlog.info() << "First class id=0 name='" << first_name
+                       << "', last class id=" << (dcf->get_num_classes() - 1)
+                       << " name='" << last_name << "'." << std::endl;
     }
     g_dcf = dcf;
 
@@ -260,7 +310,7 @@ int main(int argc, char *argv[])
     // Run the main event loop
     int exit_code = 0;
     try {
-        g_loop->run();
+        NetContext::instance().run();
     }
 
     // This exception is propogated if astron_shutdown is called
