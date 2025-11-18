@@ -42,7 +42,7 @@ messagedirector:
 ###############################################################################
 roles:
   - type: clientagent
-    bind: 127.0.0.1:6667  # Client connection port
+    bind: 127.0.0.1:7667  # Client connection port
     
     # Client version verification
     version: "MyGame v1.0"
@@ -50,55 +50,56 @@ roles:
     # Optional: Override DC hash if client uses different parser
     # manual_dc_hash: 0x12345678
     
-    # Client type and settings
-    client:
-      type: libastron  # Standard Astron client (Panda3D uses this)
-      relocate: false  # Allow clients to relocate owned objects
-      
+
       # Heartbeat configuration (0 = disabled)
-      heartbeat_timeout: 15  # seconds before disconnect
+      heartbeat_timeout: 0 # seconds before disconnect
       
       # Interest management permissions
       add_interest: visible  # Options: enabled, visible, disabled
       
     # Channel range for this ClientAgent to assign to clients
     channels:
-      min: 1000000
-      max: 1009999
+      min: 1000000000
+      max: 1099999999
 
 ###############################################################################
 # State Server - Manages object state and visibility
 ###############################################################################
   - type: stateserver
-    control: 402000
+    control: 4002
+    auto-root-directory: false # true if you want to auto generate the root directory
+    root-directory-doid: 4617 # OTP_DO_ID_PIRATES
+    root-directory-parent: 0
+    root-directory-zone: 0
+    root-directory-class: DistributedDirectory # must be a valid dclass
 
 ###############################################################################
 # Database-State Server - Persistent object management  
 ###############################################################################
   - type: dbss
     # Database to use for this DBSS
-    database: 4003000
+    database: 4003
     
     # Range of object IDs this DBSS manages
     ranges:
       - min: 100000000
-        max: 199999999
+        max: 399999999
 
 ###############################################################################
 # Database Server - MongoDB backend
 ###############################################################################
   - type: database
-    control: 4003000
+    control: 4003
     
     # ID generation range for this database
     generate:
       min: 100000000
-      max: 199999999
+      max: 399999999
     
     # MongoDB backend configuration
     backend:
       type: mongodb
-      server: mongodb://10.0.0.202:27017/astron_debug  # MongoDB connection
+      server: mongodb://127.0.0.1:27017/astron_debug  # MongoDB connection
       workers: 4  # Number of worker threads for DB operations
 
 ###############################################################################
