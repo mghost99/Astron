@@ -3,9 +3,21 @@
 #include <boost/asio/post.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/system/system_error.hpp>
+#include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <cstring>
 #include <stdexcept>
+#if defined(_WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <mstcpip.h>
+#elif defined(__linux__) || defined(__APPLE__)
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#endif
 
 #include "core/global.h"
 #include "config/ConfigVariable.h"
@@ -32,6 +44,8 @@ const boost::system::error_code kErrNoBufs = make_err(boost::system::errc::no_bu
 const boost::system::error_code kErrProto = make_err(boost::system::errc::protocol_error);
 const boost::system::error_code kErrTimedOut = make_err(boost::asio::error::timed_out);
 } // namespace
+
+static LogCategory netclient_log("network", "NetworkClient");
 
 NetworkClient::NetworkClient(NetworkHandler *handler) :
     m_handler(handler),

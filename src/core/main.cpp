@@ -6,6 +6,7 @@
 #include "clientagent/ClientAgent.h"
 #include "util/NetContext.h"
 #include "dclass/file/read.h"
+#include "dclass/file/hash.h"
 #include "dclass/dc/Class.h"
 using dclass::Class;
 
@@ -370,12 +371,7 @@ void printCompiledOptions(ostream &s)
       "16-bit length tag Datagrams, "
 #endif
 
-      //If on, channels will be 128-bit and doids and zones will be 64-bit (instead of 64/32).
-#ifdef ASTRON_128BIT_CHANNELS
-      "128-bit channel space, 64-bit distributed object id's, 64-bit zones"
-#else
       "64-bit channel space, 32-bit distributed object id's, 32-bit zones"
-#endif
       << "\n";
 
     //Now print what parts are compiled in.
