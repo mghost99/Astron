@@ -26,27 +26,12 @@ These dependencies are required for all builds of Astron:
 
 ### Database Backends ###
 
-**PostgreSQL (via SOCI):**
-- libpq (PostgreSQL client library)
-- SOCI library with PostgreSQL backend
-- Allows using PostgreSQL as the database backend
-
 **MongoDB:**
 - mongo-c-driver 2.1.2+
 - mongo-cxx-driver (releases/stable branch)
 - libmongocrypt (optional but recommended)
 - MongoDB Community Server 8.2+ (for running the database)
 - Allows using MongoDB as the database backend
-
-**MySQL (via SOCI):**
-- MySQL client library
-- SOCI library with MySQL backend
-- Allows using MySQL as the database backend
-
-**SQLite (via SOCI):**
-- SQLite3 library
-- SOCI library with SQLite backend
-- Allows using SQLite as the database backend
 
 ## Platform-Specific Packages ##
 
@@ -79,11 +64,6 @@ brew install cmake ninja boost libuv yaml-cpp openssl git bison flex
 brew install mongodb-community curl icu4c pcre snappy zlib zstd
 ```
 
-**PostgreSQL packages:**
-```bash
-brew install postgresql soci
-```
-
 ### Windows (MSYS2 MinGW64) ###
 
 **Required packages:**
@@ -100,11 +80,6 @@ pacman -S mingw-w64-x86_64-curl mingw-w64-x86_64-icu \
     mingw-w64-x86_64-pcre mingw-w64-x86_64-snappy \
     mingw-w64-x86_64-zlib mingw-w64-x86_64-zstd \
     mingw-w64-x86_64-cyrus-sasl
-```
-
-**PostgreSQL packages:**
-```bash
-pacman -S mingw-w64-x86_64-postgresql mingw-w64-x86_64-soci
 ```
 
 ### Windows (Visual Studio + vcpkg) ###

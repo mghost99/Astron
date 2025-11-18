@@ -165,20 +165,6 @@ Astron requires flex and bison for parsing dclass files. Install the Windows ver
 .\vcpkg install winflexbison:x64-windows
 ```
 
-### Optional: PostgreSQL Support (SOCI) ###
-
-For PostgreSQL database backend:
-
-```cmd
-.\vcpkg install soci[postgresql]:x64-windows
-```
-
-Or for static:
-
-```cmd
-.\vcpkg install soci[postgresql]:x64-windows-static
-```
-
 ### vcpkg Integration with Visual Studio ###
 
 **Option 1: System-wide integration (requires admin):**
@@ -303,10 +289,6 @@ Download from https://github.com/lexxmark/winflexbison/releases
 **2. Add to PATH:**
 
 Add `C:\Astron-deps\winflexbison` to your system PATH.
-
-### Optional: PostgreSQL (SOCI) ###
-
-Building SOCI manually is complex. If you need PostgreSQL support, vcpkg is strongly recommended.
 
 ### Optional: MongoDB C++ Driver ###
 
@@ -461,12 +443,10 @@ Before generating, you can set these Astron-specific options in CMake GUI:
 - `BUILD_DBSERVER` - Build Database Server component (default: ON)
 - `BUILD_DB_YAML` - Support YAML database backend (default: ON)
 - `BUILD_DB_MONGO` - Support MongoDB backend (requires mongo drivers)
-- `BUILD_DB_POSTGRESQL` - Support PostgreSQL backend (requires SOCI + libpq)
 - `BUILD_STATESERVER` - Build State Server component (default: ON)
 - `BUILD_EVENTLOGGER` - Build Event Logger component (default: ON)
 - `BUILD_CLIENTAGENT` - Build Client Agent component (default: ON)
 - `USE_32BIT_DATAGRAMS` - Use 32-bit length tags for datagrams (default: OFF)
-- `USE_128BIT_CHANNELS` - Use 128-bit channels and 64-bit doids/zones (default: OFF)
 - `BUILD_TESTS` - Compile test files (default: OFF)
 
 ### Generate the Visual Studio Solution ###

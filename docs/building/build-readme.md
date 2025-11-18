@@ -37,9 +37,6 @@ All platforms require these minimum dependency versions:
 
 Astron includes a built-in **YAML database** (perfect for development). You can optionally add:
 
-- **PostgreSQL** (via SOCI)
-- **MySQL** (via SOCI)
-- **SQLite3** (via SOCI)
 - **MongoDB** (requires manual driver builds)
 
 Each platform guide includes instructions for installing optional database support.
