@@ -113,6 +113,13 @@ sudo make install
 cd ../..
 ```
 
+### Optional: PostgreSQL Support ###
+
+For PostgreSQL database backend (using SOCI):
+
+```bash
+brew install postgresql soci
+```
 
 ### Compiling ###
 
@@ -236,6 +243,7 @@ Astron supports several CMake options that can be set during configuration:
 ```bash
 cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
     -DUSE_32BIT_DATAGRAMS=OFF \
+    -DUSE_128BIT_CHANNELS=OFF \
     -DBUILD_TESTS=OFF \
     -DBUILD_DBSERVER=ON \
     -DBUILD_DB_YAML=ON \
@@ -247,10 +255,12 @@ cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
 
 **Available Options:**
 - `USE_32BIT_DATAGRAMS`: Use 32-bit length tags for datagrams (default: OFF)
+- `USE_128BIT_CHANNELS`: Use 128-bit channels and 64-bit doids/zones (default: OFF)
 - `BUILD_TESTS`: Compile test files (default: OFF)
 - `BUILD_DBSERVER`: Build Database Server component (default: ON)
 - `BUILD_DB_YAML`: Support YAML database backend (default: ON)
 - `BUILD_DB_MONGO`: Support MongoDB backend (requires mongo drivers)
+- `BUILD_DB_POSTGRESQL`: Support PostgreSQL backend (requires SOCI + libpq)
 - `BUILD_STATESERVER`: Build State Server component (default: ON)
 - `BUILD_EVENTLOGGER`: Build Event Logger component (default: ON)
 - `BUILD_CLIENTAGENT`: Build Client Agent component (default: ON)

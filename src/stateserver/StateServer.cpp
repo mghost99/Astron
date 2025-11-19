@@ -14,11 +14,6 @@ static RoleConfigGroup stateserver_config("stateserver");
 static ConfigVariable<channel_t> control_channel("control", INVALID_CHANNEL, stateserver_config);
 static InvalidChannelConstraint control_not_invalid(control_channel);
 static ReservedChannelConstraint control_not_reserved(control_channel);
-static ConfigVariable<bool> auto_root_directory("auto-root-directory", false, stateserver_config);
-static ConfigVariable<doid_t> root_directory_doid("root-directory-doid", 0, stateserver_config);
-static ConfigVariable<doid_t> root_directory_parent("root-directory-parent", 0, stateserver_config);
-static ConfigVariable<zone_t> root_directory_zone("root-directory-zone", 0, stateserver_config);
-static ConfigVariable<std::string> root_directory_class("root-directory-class", "DistributedDirectory", stateserver_config);
 
 StateServer::StateServer(RoleConfig roleconfig) : Role(roleconfig)
 {
@@ -32,8 +27,6 @@ StateServer::StateServer(RoleConfig roleconfig) : Role(roleconfig)
         m_log = std::unique_ptr<LogCategory>(new LogCategory("stateserver", name.str()));
         set_con_name(name.str());
     }
-
-    bootstrap_root_directory();
 }
 
 void StateServer::handle_generate(DatagramIterator &dgi, bool has_other)
@@ -108,43 +101,3 @@ void StateServer::handle_datagram(DatagramHandle, DatagramIterator &dgi)
 }
 
 RoleFactoryItem<StateServer> ss_fact("stateserver");
-
-void StateServer::bootstrap_root_directory()
-{
-    if(!auto_root_directory.get_rval(m_roleconfig)) {
-        return;
-    }
-
-    doid_t do_id = root_directory_doid.get_rval(m_roleconfig);
-    if(do_id == 0) {
-        m_log->warning() << "auto-root-directory enabled but root-directory-doid is 0; skipping." << std::endl;
-        return;
-    }
-
-    if(m_objs.find(do_id) != m_objs.end()) {
-        m_log->info() << "Root directory DO " << do_id << " already exists; skipping bootstrap." << std::endl;
-        return;
-    }
-
-    const std::string classname = root_directory_class.get_rval(m_roleconfig);
-    const Class *dc_class = g_dcf->get_class_by_name(classname);
-    if(!dc_class) {
-        m_log->error() << "auto-root-directory enabled but dclass '" << classname << "' does not exist." << std::endl;
-        return;
-    }
-
-    doid_t parent = root_directory_parent.get_rval(m_roleconfig);
-    zone_t zone = root_directory_zone.get_rval(m_roleconfig);
-
-    try {
-        UnorderedFieldValues req_fields;
-        FieldValues ram_fields;
-        DistributedObject *obj = new DistributedObject(this, INVALID_CHANNEL, do_id, parent, zone,
-                                                      dc_class, req_fields, ram_fields);
-        m_objs[do_id] = obj;
-        m_log->info() << "Bootstrapped root directory '" << classname << "' (doId=" << do_id
-                      << ", parent=" << parent << ", zone=" << zone << ")." << std::endl;
-    } catch(const std::exception &e) {
-        m_log->error() << "Failed to bootstrap root directory '" << classname << "': " << e.what() << std::endl;
-    }
-}

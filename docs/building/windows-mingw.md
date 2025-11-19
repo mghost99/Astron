@@ -79,6 +79,13 @@ This will install:
 
 There is a built-in YAML database but if you want a fully featured database backend, you're in the right spot!
 
+**PostgreSQL Support (SOCI):**
+
+For PostgreSQL database backend:
+
+```bash
+pacman -S mingw-w64-x86_64-postgresql mingw-w64-x86_64-soci
+```
 
 **MongoDB Support:**
 
@@ -181,8 +188,14 @@ cd into the `Astron` folder and then cd into the `build` or `build-debug` folder
 ```bash
 cd Astron/build
 
-# Configure with full database support (YAML + MongoDB)
+# Configure with full database support (YAML + PostgreSQL + MySQL + SQLite3 + MongoDB)
 cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
+    -DSOCI_INCLUDE_DIR=/mingw64/include \
+    -DSOCI_LIBRARY=/mingw64/lib/libsoci_core_4_1.dll.a \
+    -DSOCI_LIBRARY_DIR=/mingw64/lib \
+    -DSOCI_postgresql_PLUGIN=/mingw64/lib/libsoci_postgresql_4_1.dll.a \
+    -DSOCI_mysql_PLUGIN=/mingw64/lib/libsoci_mysql_4_1.dll.a \
+    -DSOCI_sqlite3_PLUGIN=/mingw64/lib/libsoci_sqlite3_4_1.dll.a \
     -DLIBMONGOCXX_INCLUDE_DIRS=/mingw64/include/mongocxx/v_noabi \
     -DLIBMONGOCXX_LIBRARIES=/mingw64/lib/libmongocxx-static.a \
     -DLIBBSONCXX_INCLUDE_DIRS=/mingw64/include/bsoncxx/v_noabi \
@@ -192,8 +205,10 @@ cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
 ninja
 ```
 
-**Note:** MongoDB paths must be specified manually on MinGW because:
+**Note:** Both SOCI and MongoDB paths must be specified manually on MinGW because:
+- MSYS2's SOCI package doesn't include pkg-config files
 - mongo-cxx-driver static libraries use `-static` suffix in filenames
+- Version-suffixed library names (e.g., `libsoci_core_4_1.dll.a`) match MSYS2's SOCI 4.1.2 package
 
 **For development (with Trace and Debug messages):**
 
@@ -348,10 +363,13 @@ ninja
 
 **System libraries (automatically included):** The CMakeLists.txt automatically adds Windows system libraries needed by MongoDB: `dnsapi`, `bcrypt`, `ncrypt`, `secur32`, `crypt32`, `snappy`, `zstd`. You don't need to specify these manually.
 
-**For YAML-only (no MongoDB):**
+**For YAML-only (no SQL, no MongoDB):**
 
 ```bash
 cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_DB_POSTGRESQL=OFF \
+    -DBUILD_DB_MYSQL=OFF \
+    -DBUILD_DB_SQLITE=OFF \
     -DBUILD_DB_MONGO=OFF \
     ..
 
@@ -360,10 +378,12 @@ ninja
 
 **Available Options:**
 - `USE_32BIT_DATAGRAMS`: Use 32-bit length tags for datagrams (default: OFF)
+- `USE_128BIT_CHANNELS`: Use 128-bit channels and 64-bit doids/zones (default: OFF)
 - `BUILD_TESTS`: Compile test files (default: OFF)
 - `BUILD_DBSERVER`: Build Database Server component (default: ON)
 - `BUILD_DB_YAML`: Support YAML database backend (default: ON)
 - `BUILD_DB_MONGO`: Support MongoDB backend (requires mongo drivers)
+- `BUILD_DB_POSTGRESQL`: Support PostgreSQL backend (requires SOCI + libpq)
 - `BUILD_STATESERVER`: Build State Server component (default: ON)
 - `BUILD_EVENTLOGGER`: Build Event Logger component (default: ON)
 - `BUILD_CLIENTAGENT`: Build Client Agent component (default: ON)
@@ -374,6 +394,22 @@ ninja
 
 Make sure you're running from the **MSYS2 MINGW64** terminal (not MSYS or UCRT64).
 The MinGW packages are only available in the MINGW64 environment.
+
+#### CMake can't find SOCI (SQL database support) ####
+
+**This is expected!** MSYS2's SOCI package doesn't include pkg-config files, so you must specify paths manually (already included in the build commands above).
+
+**Verify SOCI is installed:**
+
+```bash
+pacman -Qs soci
+# Should show: local/mingw-w64-x86_64-soci 4.1.2-1
+
+ls /mingw64/lib/libsoci*
+# Should show: libsoci_core_4_1.dll.a, libsoci_postgresql_4_1.dll.a, etc.
+```
+
+**The version-suffixed names are correct** - MSYS2's SOCI 4.1.2 uses `_4_1` in filenames. The build instructions above already include the correct paths with version suffixes.
 
 #### CMake can't find MongoDB client library ####
 

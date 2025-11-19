@@ -145,6 +145,11 @@ if(USE_32BIT_DATAGRAMS)
 	add_definitions(-DASTRON_32BIT_DATAGRAMS)
 	add_definitions(-DDCLASS_32BIT_SIZETAG)
 endif()
+set(USE_128BIT_CHANNELS OFF CACHE BOOL
+	"If on, channels will be 128-bit and doids and zones will be 64-bit (instead of 64/32).")
+if(USE_128BIT_CHANNELS)
+	add_definitions(-DASTRON_128BIT_CHANNELS)
+endif()
 
 set(BUILD_TESTS OFF CACHE BOOL "If set to true, test files will be compiled in")
 if(BUILD_TESTS)
@@ -242,9 +247,85 @@ if(BUILD_DBSERVER)
 		list(APPEND PYTHON_TESTS db_mongo)
 	endif()
 
+	### Check for soci and if available, compile SQL database support ###
+	find_package(Soci COMPONENTS postgresql mysql sqlite3)
+
+	if(SOCI_FOUND)
+		message(STATUS "Found the following Soci library:")
+		message("  ${SOCI_LIBRARY}\n")
+
+		message(STATUS "Found the following Soci plugins:")
+		### PostgreSQL support ##
+		if(SOCI_postgresql_FOUND)
+			set(BUILD_DB_POSTGRESQL ON CACHE BOOL "If on, will support PostgreSQL.")
+			message(STATUS "  PostgreSQL found")
+			message("	 ${SOCI_postgresql_PLUGIN}")
+		else()
+			unset(BUILD_DB_POSTGRESQL CACHE)
+			message(STATUS "  PostgreSQL not found")
+			message("	 won't add PostgreSQl support")
+		endif()
+
+		### MySQL support ###
+		if(SOCI_mysql_FOUND)
+			set(BUILD_DB_MYSQL ON CACHE BOOL "If on, will support MySQL.")
+			message(STATUS "  MySQL found")
+			message("	 ${SOCI_mysql_PLUGIN}")
+		else()
+			unset(BUILD_DB_MYSQL CACHE)
+			message(STATUS "  MySQL not found")
+			message("	 won't add MySQL support")
+		endif()
+
+		### SQLite3 support ###
+		if(SOCI_sqlite3_FOUND)
+			set(BUILD_DB_SQLITE ON CACHE BOOL "If on, will support SQLite3.")
+			message(STATUS "  SQLite3 found")
+			message("	 ${SOCI_sqlite3_PLUGIN}")
+		else()
+			unset(BUILD_DB_SQLITE CACHE)
+			message(STATUS "  SQLite3 not found")
+			message("	 won't add SQLite3 support")
+		endif()
+
+		message("")
+
+		### Add files to compiler and linker ###
+		if(BUILD_DB_SQLITE OR BUILD_DB_MYSQL OR BUILD_DB_POSTGRESQL)
+			add_definitions(-DBUILD_DB_SQL)
+			include_directories(${SOCI_INCLUDE_DIRS})
+			link_directories(${SOCI_LIBRARY_DIR})
+		set(DBSERVER_FILES
+			${DBSERVER_FILES}
+			src/database/SociSQLDatabase.cpp
+		)
+
+			list(APPEND DB_LIBRARY_NAMES ${SOCI_LIBRARY})
+			if(NOT WIN32)
+				list(APPEND DB_LIBRARY_NAMES dl)
+			endif()
+			if(BUILD_DB_POSTGRESQL)
+			list(APPEND DB_LIBRARY_NAMES pq)
+			add_test(db_pgsql 
+				"${PYTHON_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/test/test_dbserver_postgres.py")
+			add_test(validate_config_dbpostgres
+				"${PYTHON_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/test/test_config_dbpostgres.py")
+				set(PYTHON_TESTS ${PYTHON_TESTS} db_pgsql validate_config_dbpostgres)
+			endif()
+		endif()
+	else()
+		message(STATUS "Soci not found")
+		message("  won't add SQL support")
+		unset(BUILD_DB_MYSQL CACHE)
+		unset(BUILD_DB_POSTGRESQL CACHE)
+		unset(BUILD_DB_SQLITE CACHE)
+	endif()
 else()
 	unset(BUILD_DB_FILESYSTEM CACHE)
 	unset(BUILD_DB_YAML CACHE)
+	unset(BUILD_DB_MYSQL CACHE)
+	unset(BUILD_DB_POSTGRESQL CACHE)
+	unset(BUILD_DB_SQLITE CACHE)
 	unset(BUILD_DB_MONGO CACHE)
 endif()
 
@@ -442,6 +523,7 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 		# Dependency DLLs
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libyaml-cpp.dll" "${CMAKE_SOURCE_DIR}/built/"
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libuv-1.dll" "${CMAKE_SOURCE_DIR}/built/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libsoci_core_4_1.dll" "${CMAKE_SOURCE_DIR}/built/"
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libsnappy.dll" "${CMAKE_SOURCE_DIR}/built/"
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libzstd.dll" "${CMAKE_SOURCE_DIR}/built/"
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different "C:/msys64/mingw64/bin/libmongocrypt.dll" "${CMAKE_SOURCE_DIR}/built/"
@@ -455,6 +537,9 @@ install(TARGETS astrond DESTINATION bin)
 ### Handle some final testing configuration ###
 if(USE_32BIT_DATAGRAMS)
 	set(PYTHON_TEST_ENV ${PYTHON_TEST_ENV} "USE_32BIT_DATAGRAMS=true")
+endif()
+if(USE_128BIT_CHANNELS)
+	set(PYTHON_TEST_ENV ${PYTHON_TEST_ENV} "USE_128BIT_CHANNELS=true")
 endif()
 if(PYTHON_TEST_ENV)
 	set_tests_properties(${PYTHON_TESTS} PROPERTIES ENVIRONMENT "${PYTHON_TEST_ENV}")
