@@ -226,8 +226,6 @@ ConfigSchema ClientAgent::schema()
             client.optional_string("manual_dc_hash");
             client.optional_bool("send_hash");
             client.optional_bool("send_version");
-            client.optional_int("write_buffer_size");
-            client.optional_int("write_timeout_ms");
         });
         builder.optional_object("tuning", [](config::SchemaBuilder &tuning) {
             tuning.allow_additional(false);
