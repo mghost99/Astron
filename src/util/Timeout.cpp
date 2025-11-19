@@ -1,9 +1,8 @@
 #include "Timeout.h"
-#include <chrono>
-#include <boost/system/error_code.hpp>
 #include "core/global.h"
 
 Timeout::Timeout(unsigned long ms, std::function<void()> f) :
+    m_loop(g_loop),
     m_timer(nullptr),
     m_callback_disabled(false)
 {
@@ -11,6 +10,7 @@ Timeout::Timeout(unsigned long ms, std::function<void()> f) :
 }
 
 Timeout::Timeout() :
+    m_loop(g_loop),
     m_timer(nullptr),
     m_callback_disabled(false)
 {
@@ -28,7 +28,11 @@ void Timeout::setup()
 {
     assert(m_timer == nullptr);
 
-    m_timer = std::make_shared<boost::asio::steady_timer>(NetContext::instance().context());
+    m_timer = m_loop->resource<uvw::TimerHandle>();
+
+    m_timer->on<uvw::TimerEvent>([self = this](const uvw::TimerEvent&, uvw::TimerHandle&) {
+        self->timer_callback();
+    });
 }
 
 void Timeout::destroy_timer()
@@ -36,8 +40,9 @@ void Timeout::destroy_timer()
     m_callback = nullptr;
 
     if(m_timer) {
-        m_timer->cancel();
-        m_timer.reset();
+        m_timer->stop();
+        m_timer->close();
+        m_timer = nullptr;
     }
 
     delete this;
@@ -62,14 +67,8 @@ void Timeout::reset()
         setup();
     }
 
-    m_timer->cancel();
-    m_timer->expires_after(std::chrono::milliseconds(m_timeout_interval));
-    auto self = this;
-    m_timer->async_wait([self](const boost::system::error_code &ec) {
-        if(!ec) {
-            self->timer_callback();
-        }
-    });
+    m_timer->stop();
+    m_timer->start(uvw::TimerHandle::Time{m_timeout_interval}, uvw::TimerHandle::Time{0});
 }
 
 bool Timeout::cancel()

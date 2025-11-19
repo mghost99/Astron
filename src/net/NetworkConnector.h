@@ -1,9 +1,8 @@
 #pragma once
-#include <boost/asio/ip/tcp.hpp>
-#include "NetTypes.h"
+#include "deps/uvw/uvw.hpp"
 
-typedef std::function<void(const std::shared_ptr<boost::asio::ip::tcp::socket> &)> ConnectCallback;
-typedef std::function<void(const NetErrorEvent& evt)> ConnectErrorCallback;
+typedef std::function<void(const std::shared_ptr<uvw::TcpHandle> &)> ConnectCallback;
+typedef std::function<void(const uvw::ErrorEvent& evt)> ConnectErrorCallback;
 
 class NetworkConnector : public std::enable_shared_from_this<NetworkConnector>
 {
@@ -12,12 +11,13 @@ class NetworkConnector : public std::enable_shared_from_this<NetworkConnector>
     // as part of the address, it will use default_port.
     // The provided callback will be invoked with the created socket post-connection.
 
-    NetworkConnector();
+    NetworkConnector(const std::shared_ptr<uvw::Loop> &loop);
     void destroy();
     void connect(const std::string &address, unsigned int default_port,
                  ConnectCallback callback, ConnectErrorCallback err_callback);
   private:
-    std::shared_ptr<boost::asio::ip::tcp::socket> m_socket;
+    std::shared_ptr<uvw::TcpHandle> m_socket;
+    std::shared_ptr<uvw::Loop> m_loop;
     ConnectCallback m_connect_callback;
     ConnectErrorCallback m_err_callback;
 

@@ -1,11 +1,8 @@
 #pragma once
 #include <thread>
-#include <memory>
-#include <boost/asio/ip/tcp.hpp>
-#include "NetTypes.h"
-#include "util/NetContext.h"
+#include "deps/uvw/uvw.hpp"
 
-typedef std::function<void(const NetErrorEvent& evt)> AcceptorErrorCallback;
+typedef std::function<void(const uvw::ErrorEvent& evt)> AcceptorErrorCallback;
 
 class NetworkAcceptor
 {
@@ -25,8 +22,9 @@ class NetworkAcceptor
     }
 
   protected:
-    boost::asio::io_context &m_io;
-    std::unique_ptr<boost::asio::ip::tcp::acceptor> m_acceptor;
+    std::unique_ptr<std::thread> m_thread;
+    std::shared_ptr<uvw::Loop> m_loop;
+    std::shared_ptr<uvw::TcpHandle> m_acceptor;
 
     bool m_started = false;
     bool m_haproxy_mode = false;

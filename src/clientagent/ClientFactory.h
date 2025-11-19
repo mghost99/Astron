@@ -1,17 +1,16 @@
 #pragma once
 #include "Client.h"
-#include "config/ConfigSection.h"
-#include "net/NetTypes.h"
+#include "config/ConfigVariable.h"
 #include <unordered_map>
 
 // A BaseClientType is a common ancestor that all client factory templates inherit from.
 class BaseClientType
 {
   public:
-    virtual Client* instantiate(const ConfigSection &config, ClientAgent* client_agent,
-                                const TcpSocketPtr &socket,
-                                const NetAddress &remote,
-                                const NetAddress &local,
+    virtual Client* instantiate(ConfigNode config, ClientAgent* client_agent,
+                                const std::shared_ptr<uvw::TcpHandle> &socket,
+                                const uvw::Addr &remote,
+                                const uvw::Addr &local,
                                 const bool haproxy_mode) = 0;
   protected:
     BaseClientType(const std::string &name);
@@ -27,10 +26,10 @@ class ClientType : public BaseClientType
     {
     }
 
-    virtual Client* instantiate(const ConfigSection &config, ClientAgent* client_agent,
-                                const TcpSocketPtr &socket,
-                                const NetAddress &remote,
-                                const NetAddress &local,
+    virtual Client* instantiate(ConfigNode config, ClientAgent* client_agent,
+                                const std::shared_ptr<uvw::TcpHandle> &socket,
+                                const uvw::Addr &remote,
+                                const uvw::Addr &local,
                                 const bool haproxy_mode)
     {
         return new T(config, client_agent, socket, remote, local, haproxy_mode);
@@ -44,10 +43,10 @@ class ClientFactory
     static ClientFactory& singleton();
 
     // instantiate_client creates a new Client object of type 'client_type'.
-    Client* instantiate_client(const std::string &client_type, const ConfigSection &config,
-                               ClientAgent* client_agent, const TcpSocketPtr &socket,
-                               const NetAddress &remote,
-                               const NetAddress &local,
+    Client* instantiate_client(const std::string &client_type, ConfigNode config,
+                               ClientAgent* client_agent, const std::shared_ptr<uvw::TcpHandle> &socket,
+                               const uvw::Addr &remote,
+                               const uvw::Addr &local,
                                const bool haproxy_mode);
     // add_client_type adds a factory for client of type 'name'
     // It is called automatically when instantiating a new ClientType.

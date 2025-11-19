@@ -3,7 +3,6 @@
 #include "messagedirector/MessageDirector.h"
 #include "util/EventSender.h"
 #include "util/Timeout.h"
-#include "config/ConfigSection.h"
 
 #include <vector>
 #include <queue>
@@ -148,7 +147,7 @@ class Client : public MDParticipantInterface
     std::mutex m_timeout_mutex;
     std::queue<TimeoutSetCallback> m_pending_timeouts;
 
-    Client(const ConfigSection &config, ClientAgent* client_agent);
+    Client(ConfigNode config, ClientAgent* client_agent);
 
     // annihilate should be called to delete the client after the client has-left/disconnected.
     void annihilate();

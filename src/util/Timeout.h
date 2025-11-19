@@ -1,13 +1,11 @@
 #pragma once
-#include <atomic>
 #include <functional>
+#include <atomic>
 #include <memory>
-#include <boost/asio/steady_timer.hpp>
-
+#include "deps/uvw/uvw.hpp"
 #include "util/TaskQueue.h"
-#include "util/NetContext.h"
 
-// This class abstracts a boost::asio::steady_timer in order to provide a generic
+// This class abstracts the uvw::TimerHandle timer in order to provide a generic
 // facility for timeouts. Once constructed, this class will wait a certain
 // amount of time and then call the function. The timeout must be canceled
 // with cancel() before you invalidate your callback.
@@ -46,7 +44,8 @@ class Timeout
     void initialize(unsigned long ms, TimeoutCallback callback);
 
   private:
-    std::shared_ptr<boost::asio::steady_timer> m_timer;
+    std::shared_ptr<uvw::Loop> m_loop;
+    std::shared_ptr<uvw::TimerHandle> m_timer;
     TimeoutCallback m_callback;
     unsigned long m_timeout_interval;
 

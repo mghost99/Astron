@@ -1,15 +1,8 @@
 #pragma once
-#include <functional>
-#include <memory>
-#include <boost/asio/ip/tcp.hpp>
-
 #include "NetworkAcceptor.h"
-#include "NetTypes.h"
+#include <functional>
 
-typedef std::function<void(const std::shared_ptr<boost::asio::ip::tcp::socket>&,
-                           const NetAddress& remote,
-                           const NetAddress& local,
-                           const bool haproxy_mode)> TcpAcceptorCallback;
+typedef std::function<void(const std::shared_ptr<uvw::TcpHandle>&, const uvw::Addr& remote, const uvw::Addr& local, const bool haproxy_mode)> TcpAcceptorCallback;
 
 class TcpAcceptor : public NetworkAcceptor
 {
@@ -21,8 +14,6 @@ class TcpAcceptor : public NetworkAcceptor
     TcpAcceptorCallback m_callback;
 
     virtual void start_accept();
-    void handle_accept(const std::shared_ptr<boost::asio::ip::tcp::socket>& socket);
-    void handle_endpoints(const std::shared_ptr<boost::asio::ip::tcp::socket>& socket,
-                          const NetAddress& remote,
-                          const NetAddress& local);
+    void handle_accept(const std::shared_ptr<uvw::TcpHandle>& socket);
+    void handle_endpoints(const std::shared_ptr<uvw::TcpHandle>& socket, const uvw::Addr& remote, const uvw::Addr& local);
 };

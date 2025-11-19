@@ -1,12 +1,11 @@
+#include "core/global.h"
 #include "NetworkAcceptor.h"
 #include "address_utils.h"
-#include "core/global.h"
-#include "util/NetContext.h"
-#include <boost/system/error_code.hpp>
+
 
 NetworkAcceptor::NetworkAcceptor(AcceptorErrorCallback err_callback) :
-    m_io(NetContext::instance().context()),
-    m_acceptor(std::make_unique<boost::asio::ip::tcp::acceptor>(m_io)),
+    m_loop(g_loop),
+    m_acceptor(nullptr),
     m_started(false),
     m_haproxy_mode(false),
     m_err_callback(err_callback)
@@ -18,44 +17,21 @@ void NetworkAcceptor::bind(const std::string &address,
 {
     assert(std::this_thread::get_id() == g_main_thread_id);
 
-    auto addresses = resolve_address(address, default_port);
+    m_acceptor = m_loop->resource<uvw::TcpHandle>();
+    m_acceptor->simultaneousAccepts(true);
 
-    if(addresses.empty()) {
-        m_err_callback(NetErrorEvent(make_error_code(boost::system::errc::address_not_available)));
+    std::vector<uvw::Addr> addresses = resolve_address(address, default_port, m_loop);
+
+    if(addresses.size() == 0) {
+        this->m_err_callback(uvw::ErrorEvent{(int)UV_EADDRNOTAVAIL});
         return;
     }
 
-    boost::system::error_code last_error;
-    bool bound = false;
+    // Setup listen/error event handlers.
+    start_accept();
 
-    for(const auto &addr : addresses) {
-        boost::asio::ip::tcp::endpoint endpoint = to_endpoint(addr);
-        last_error.clear();
-
-        m_acceptor->close();
-        m_acceptor->open(endpoint.protocol(), last_error);
-        if(last_error) {
-            continue;
-        }
-
-        boost::asio::socket_base::reuse_address reuse(true);
-        m_acceptor->set_option(reuse, last_error);
-        if(last_error) {
-            continue;
-        }
-
-        m_acceptor->bind(endpoint, last_error);
-        if(last_error) {
-            continue;
-        }
-
-        bound = true;
-        break;
-    }
-
-    if(!bound) {
-        m_err_callback(NetErrorEvent(last_error));
-        return;
+    for (uvw::Addr& addr : addresses) {
+        m_acceptor->bind(addr);
     }
 }
 
@@ -71,14 +47,7 @@ void NetworkAcceptor::start()
     m_started = true;
     
     // Queue listener for loop.
-    boost::system::error_code ec;
-    m_acceptor->listen(boost::asio::socket_base::max_listen_connections, ec);
-    if(ec) {
-        m_err_callback(NetErrorEvent(ec));
-        return;
-    }
-
-    start_accept();
+    m_acceptor->listen();
 }
 
 void NetworkAcceptor::stop()
@@ -92,6 +61,5 @@ void NetworkAcceptor::stop()
 
     m_started = false;
 
-    boost::system::error_code ec;
-    m_acceptor->close(ec);
+    m_acceptor->close();
 }

@@ -4,6 +4,7 @@
 #include "dclass/dc/File.h"
 #include "util/EventSender.h"
 #include "util/TaskQueue.h"
+#include "deps/uvw/uvw.hpp"
 #include <unordered_map>
 #include <thread>
 #include <cassert>
@@ -25,3 +26,4 @@ extern std::unique_ptr<ConfigFile> g_config;
 extern EventSender g_eventsender;
 extern std::unordered_map<doid_t, Uberdog> g_uberdogs;
 extern std::thread::id g_main_thread_id;
+extern std::shared_ptr<uvw::Loop> g_loop;

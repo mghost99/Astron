@@ -1,13 +1,12 @@
 #pragma once
 #include "core/Role.h"
 #include "Client.h"
-#include "config/ConfigSection.h"
-#include "config/ConfigSchema.h"
 
 #include <memory>
-#include <queue>
 
-#include "net/NetTypes.h"
+extern RoleConfigGroup clientagent_config;
+extern KeyedConfigGroup ca_client_config;
+extern ConfigVariable<std::string> ca_client_type;
 
 // A ChannelTracker is used to keep track of available and allocated channels that
 // the ClientAgent can use to assign to new Clients.
@@ -33,15 +32,13 @@ class ClientAgent final : public Role
   public:
     ClientAgent(RoleConfig rolconfig);
 
-    static ConfigSchema schema();
-
     // handle_tcp generates a new Client object from a raw tcp connection.
-    void handle_tcp(const TcpSocketPtr &socket,
-                    const NetAddress &remote,
-                    const NetAddress &local,
+    void handle_tcp(const std::shared_ptr<uvw::TcpHandle> &socket,
+                    const uvw::Addr &remote,
+                    const uvw::Addr &local,
                     const bool haproxy_mode);
 
-    void handle_error(const NetErrorEvent& evt);
+    void handle_error(const uvw::ErrorEvent& evt);
 
     // handle_datagram handles Datagrams received from the message director.
     // Currently the ClientAgent does not handle any datagrams,
@@ -68,7 +65,7 @@ class ClientAgent final : public Role
     std::string m_client_type;
     std::string m_server_version;
     ChannelTracker m_ct;
-    ConfigSection m_client_config;
+    ConfigNode m_clientconfig;
     std::unique_ptr<LogCategory> m_log;
     uint32_t m_hash;
 

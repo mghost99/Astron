@@ -3,14 +3,10 @@
 #include <deque>
 #include <queue>
 #include <mutex>
-#include <array>
-#include <memory>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/steady_timer.hpp>
+#include "deps/uvw/uvw.hpp"
 #include "util/Datagram.h"
 #include "util/TaskQueue.h"
 #include "HAProxyHandler.h"
-#include "NetTypes.h"
 
 // NOTES:
 //
@@ -35,7 +31,7 @@ protected:
     virtual void receive_datagram(DatagramHandle dg) = 0;
     // receive_disconnect is called when the remote host closes the
     //     connection or otherwise when the tcp connection is lost.
-    virtual void receive_disconnect(const NetErrorEvent &) = 0;
+    virtual void receive_disconnect(const uvw::ErrorEvent &) = 0;
 
     friend class NetworkClient;
 };
@@ -46,15 +42,15 @@ public:
     NetworkClient(NetworkHandler *handler);
     ~NetworkClient();
 
-    inline void initialize(const std::shared_ptr<boost::asio::ip::tcp::socket>& socket)
+    inline void initialize(const std::shared_ptr<uvw::TcpHandle>& socket)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         initialize(socket, lock);
     }
 
-    inline void initialize(const std::shared_ptr<boost::asio::ip::tcp::socket>& socket,
-                           const NetAddress& remote,
-                           const NetAddress& local,
+    inline void initialize(const std::shared_ptr<uvw::TcpHandle>& socket,
+                           const uvw::Addr& remote,
+                           const uvw::Addr& local,
                            const bool haproxy_mode)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -77,7 +73,7 @@ public:
     void send_datagram(DatagramHandle dg);
 
     // disconnect closes the TCP connection without informing the NetworkHandler.
-    inline void disconnect(const boost::system::error_code &ec)
+    inline void disconnect(uv_errno_t ec)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         disconnect(ec, lock);
@@ -85,11 +81,11 @@ public:
 
     inline void disconnect()
     {
-        disconnect(boost::system::error_code{});
+        disconnect((uv_errno_t)0);
     }
 
     // handle_disconnect closes the TCP connection and informs the NetworkHandler.
-    inline void handle_disconnect(const boost::system::error_code &ec)
+    inline void handle_disconnect(uv_errno_t ec)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         handle_disconnect(ec, lock);
@@ -102,13 +98,13 @@ public:
         return is_connected(lock);
     }
 
-    inline NetAddress get_remote()
+    inline uvw::Addr get_remote()
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         return m_remote;
     }
 
-    inline NetAddress get_local()
+    inline uvw::Addr get_local()
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         return m_local;
@@ -130,29 +126,17 @@ public:
 
 private:
     // Locked versions of public functions:
-    inline void initialize(const std::shared_ptr<boost::asio::ip::tcp::socket>& socket, std::unique_lock<std::mutex> &lock)
+    inline void initialize(const std::shared_ptr<uvw::TcpHandle>& socket, std::unique_lock<std::mutex> &lock)
     {
-        boost::system::error_code ec;
-        NetAddress remote;
-        NetAddress local;
-        auto remote_ep = socket->remote_endpoint(ec);
-        if(!ec) {
-            remote = make_address(remote_ep);
-        }
-        ec.clear();
-        auto local_ep = socket->local_endpoint(ec);
-        if(!ec) {
-            local = make_address(local_ep);
-        }
-        initialize(socket, remote, local, false, lock);
+        initialize(socket, socket->peer(), socket->sock(), false, lock);
     }
 
-    void initialize(const std::shared_ptr<boost::asio::ip::tcp::socket>& socket,
-                    const NetAddress &remote,
-                    const NetAddress &local,
+    void initialize(const std::shared_ptr<uvw::TcpHandle>& socket,
+                    const uvw::Addr &remote,
+                    const uvw::Addr &local,
                     const bool haproxy_mode,
                     std::unique_lock<std::mutex> &lock);
-    void disconnect(const boost::system::error_code &ec, std::unique_lock<std::mutex> &lock);
+    void disconnect(uv_errno_t ec, std::unique_lock<std::mutex> &lock);
 
     /* This cleans up all libuv handles */
     void shutdown(std::unique_lock<std::mutex> &lock);
@@ -167,29 +151,27 @@ private:
 
     // start_receive is called by initialize() to begin receiving data.
     void start_receive();
-    void schedule_read();
 
-    void handle_disconnect(const boost::system::error_code &ec, std::unique_lock<std::mutex> &lock);
+    void handle_disconnect(uv_errno_t ec, std::unique_lock<std::mutex> &lock);
 
     void defragment_input(std::unique_lock<std::mutex> &lock);
     void process_datagram(const std::unique_ptr<char[]>& data, size_t length);
 
     inline bool is_connected(std::unique_lock<std::mutex>&)
     {   
-        return m_socket != nullptr && m_socket->is_open();
+        return m_socket != nullptr;
     }
 
     bool m_is_sending = false;
     std::unique_ptr<char[]> m_send_buf;
 
     NetworkHandler *m_handler;
-    std::shared_ptr<boost::asio::ip::tcp::socket> m_socket;
-    std::shared_ptr<boost::asio::steady_timer> m_async_timer;
+    std::shared_ptr<uvw::TcpHandle> m_socket;
+    std::shared_ptr<uvw::TimerHandle> m_async_timer;
     std::unique_ptr<HAProxyHandler> m_haproxy_handler;
-    NetAddress m_remote;
-    NetAddress m_local;
+    uvw::Addr m_remote;
+    uvw::Addr m_local;
     std::vector<uint8_t> m_data_buf;
-    std::array<char, 65536> m_read_buffer;
 
     // HAProxy specific:
     std::vector<uint8_t> m_tlv_buf;
@@ -206,5 +188,5 @@ private:
     bool m_local_disconnect = false;
     bool m_haproxy_mode = false;
 
-    boost::system::error_code m_disconnect_error;
+    uv_errno_t m_disconnect_error;
 };

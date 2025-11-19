@@ -1,13 +1,10 @@
 #pragma once
-#include <string>
 #include <unordered_map>
 #include <vector>
-#include <memory>
-#include <boost/asio/ip/udp.hpp>
+#include <string>
 
-#include "core/Logger.h"
+#include "deps/uvw/uvw.hpp"
 #include "util/Datagram.h"
-#include "net/NetTypes.h"
 
 // This is a convenience class for building up MessagePack logs.
 class LoggedEvent
@@ -39,7 +36,8 @@ class EventSender
     }
   private:
     LogCategory m_log;
-    std::shared_ptr<boost::asio::ip::udp::socket> m_socket;
-    boost::asio::ip::udp::endpoint m_target;
+    std::shared_ptr<uvw::Loop> m_loop;
+    std::shared_ptr<uvw::UDPHandle> m_socket;
+    uvw::Addr m_target;
     bool m_enabled;
 };

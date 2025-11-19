@@ -2,7 +2,7 @@
 #include "core/global.h"
 #include "core/msgtypes.h"
 
-MDNetworkParticipant::MDNetworkParticipant(const TcpSocketPtr &socket)
+MDNetworkParticipant::MDNetworkParticipant(const std::shared_ptr<uvw::TcpHandle> &socket)
     : MDParticipantInterface(), m_client(std::make_shared<NetworkClient>(this))
 {
     set_con_name("Network Participant");
@@ -85,11 +85,11 @@ void MDNetworkParticipant::receive_datagram(DatagramHandle dg)
     route_datagram(dg);
 }
 
-void MDNetworkParticipant::receive_disconnect(const NetErrorEvent &evt)
+void MDNetworkParticipant::receive_disconnect(const uvw::ErrorEvent &evt)
 {
     logger().info() << "Lost connection from "
                     << m_client->get_remote().ip << ":"
                     << m_client->get_remote().port << ": "
-                    << evt.message() << std::endl;
+                    << evt.what() << std::endl;
     terminate();
 }

@@ -5,22 +5,18 @@
 #include <queue>
 #include <deque>
 #include <thread>
-#include <stop_token>
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <condition_variable>
 #include <boost/lockfree/queue.hpp>
 #include <boost/icl/interval_map.hpp>
-#include <boost/asio/steady_timer.hpp>
 #include "ChannelMap.h"
 #include "core/global.h"
 #include "util/Datagram.h"
 #include "util/DatagramIterator.h"
 #include "util/TaskQueue.h"
 #include "net/NetworkAcceptor.h"
-#include "net/NetTypes.h"
-#include "util/NetContext.h"
 
 class MDParticipantInterface;
 class MDUpstream;
@@ -51,7 +47,7 @@ class MessageDirector final : public ChannelMap
 
     // For MDUpstream (and subclasses) to call.
     void receive_datagram(DatagramHandle dg);
-    void receive_disconnect(const NetErrorEvent &evt);
+    void receive_disconnect(const uvw::ErrorEvent &evt);
 
   protected:
     void on_add_channel(channel_t c);
@@ -76,7 +72,7 @@ class MessageDirector final : public ChannelMap
     bool m_main_is_routing;
     
     // Thread pool for parallel message processing
-    std::vector<std::jthread> m_thread_pool;
+    std::vector<std::jthread> m_thread_pool;  // C++20 jthread auto-joins on destruction
     size_t m_num_threads;
     
     // Lock-free queue for high-performance message routing
@@ -87,12 +83,12 @@ class MessageDirector final : public ChannelMap
     std::mutex m_terminated_lock;
     
     // Periodic cleanup timer for thread-safe participant deletion
-    std::shared_ptr<boost::asio::steady_timer> m_cleanup_timer;
+    std::shared_ptr<uvw::TimerHandle> m_cleanup_timer;
     
     void flush_queue();
     void process_datagram(MDParticipantInterface *p, DatagramHandle dg);
     void process_terminates();
-    void routing_thread(std::stop_token stop_token, size_t thread_id);
+    void routing_thread(size_t thread_id);
     void shutdown_threading();
 
     LogCategory m_log;
@@ -104,9 +100,8 @@ class MessageDirector final : public ChannelMap
     void recall_post_removes(channel_t sender);
 
     // I/O OPERATIONS
-    void handle_connection(const TcpSocketPtr &socket);
-    void handle_error(const NetErrorEvent& evt);
-    void schedule_cleanup();
+    void handle_connection(const std::shared_ptr<uvw::TcpHandle> &socket);
+    void handle_error(const uvw::ErrorEvent& evt);
 };
 
 

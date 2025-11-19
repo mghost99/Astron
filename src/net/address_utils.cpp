@@ -2,10 +2,10 @@
 
 #include <algorithm>
 #include <utility>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/system/error_code.hpp>
 
-#include "util/NetContext.h"
+#include "deps/uvw/uvw.hpp"
+#include "deps/uvw/uvw/util.hpp"
+#include <uv.h>
 
 static bool split_port(std::string &ip, uint16_t &port)
 {
@@ -38,23 +38,38 @@ static bool split_port(std::string &ip, uint16_t &port)
     return true;
 }
 
-static std::pair<bool, NetAddress> parse_address(const std::string &ip, uint16_t port)
+static std::pair<bool, uvw::Addr> parse_address(const std::string &ip, uint16_t port)
 {
-    std::string cleaned = ip;
-    if(!cleaned.empty() && cleaned.front() == '[' && cleaned.back() == ']') {
-        cleaned = cleaned.substr(1, cleaned.length() - 2);
-    }
+    if((ip.find(':') != std::string::npos) || (ip[0] == '[' && ip[ip.length() - 1] == ']')) {
+        sockaddr_in6 sockaddr;
+        size_t opening_bracket = ip.find('[');
+        size_t closing_bracket = ip.find(']');
+        if((opening_bracket != std::string::npos && closing_bracket == std::string::npos) ||
+           (closing_bracket != std::string::npos && opening_bracket == std::string::npos)) {
+            // Unbalanced set of brackets, this is an invalid address.
+            return std::pair<bool, uvw::Addr>(false, uvw::Addr());
+        }
 
-    boost::system::error_code ec;
-    auto address = boost::asio::ip::make_address(cleaned, ec);
-    if(ec) {
-        return std::make_pair(false, NetAddress{});
+        // Strip brackets from IPv6 address (if they exist). libuv won't accept them otherwise.
+        std::string unbracketed_addr = ip;
+        unbracketed_addr.erase(std::remove(unbracketed_addr.begin(), unbracketed_addr.end(), '['), unbracketed_addr.end());
+        unbracketed_addr.erase(std::remove(unbracketed_addr.begin(), unbracketed_addr.end(), ']'), unbracketed_addr.end());
+        if(uv_ip6_addr(unbracketed_addr.c_str(), port, &sockaddr) == 0) {
+            return std::pair<bool, uvw::Addr>(true, uvw::details::address<uvw::IPv6>(&sockaddr));
+        }
+        else {
+            return std::pair<bool, uvw::Addr>(false, uvw::Addr());
+        }
+    } else {
+        sockaddr_in sockaddr;
+        if (uv_ip4_addr(ip.c_str(), port, &sockaddr) == 0) {
+            uvw::Addr addr = uvw::details::address<uvw::IPv4>(&sockaddr);
+            return std::pair<bool, uvw::Addr>(true, addr);
+        }
+        else {
+            return std::pair<bool, uvw::Addr>(false, uvw::Addr());
+        }
     }
-
-    NetAddress addr;
-    addr.ip = address.to_string();
-    addr.port = port;
-    return std::make_pair(true, addr);
 }
 
 static bool validate_hostname(const std::string &hostname)
@@ -111,9 +126,18 @@ bool is_valid_address(const std::string &hostspec)
     }
 }
 
-std::vector<NetAddress> resolve_address(const std::string &hostspec, uint16_t port)
+std::vector<uvw::Addr> resolve_address(const std::string &hostspec, uint16_t port, const std::shared_ptr<uvw::Loop> &loop)
 {
-    std::vector<NetAddress> ret;
+    #ifdef _WIN32
+        // Windows seems to consistently do the wrong thing here:
+        // For nodeAddrInfoSync requests, libuv always returns an ai_socktype of 0.
+        // Ergo, this hack is necessary for DNS resolutions on Windows.
+        const int socktype = 0;
+    #else
+        const int socktype = SOCK_STREAM;
+    #endif
+
+    std::vector<uvw::Addr> ret;
 
     std::string host = hostspec;
 
@@ -124,19 +148,29 @@ std::vector<NetAddress> resolve_address(const std::string &hostspec, uint16_t po
     auto result = parse_address(host, port);
     if(result.first) {
         ret.push_back(result.second);
-        return ret;
-    }
+    } else {
+        std::shared_ptr<uvw::GetAddrInfoReq> request = loop->resource<uvw::GetAddrInfoReq>();
+        auto results = request->nodeAddrInfoSync(host);
+        if (results.first) {
+            addrinfo* addrinfo = results.second.get();
+            while (addrinfo != nullptr) {
+                if (addrinfo->ai_family == AF_INET && addrinfo->ai_socktype == socktype) {
+                    sockaddr_in* sockaddr = reinterpret_cast<sockaddr_in*>(addrinfo->ai_addr);
+                    uvw::Addr addr = uvw::details::address<uvw::IPv4>(sockaddr);
+                    addr.port = port;
+                    ret.push_back(addr);
+                }
+                else if (addrinfo->ai_family == AF_INET6 && addrinfo->ai_socktype == socktype) {
+                    sockaddr_in6* sockaddr = reinterpret_cast<sockaddr_in6*>(addrinfo->ai_addr);
+                    uvw::Addr addr = uvw::details::address<uvw::IPv6>(sockaddr);
+                    addr.port = port;
+                    ret.push_back(addr);
+                }
 
-    auto &io = NetContext::instance().context();
-    boost::asio::ip::tcp::resolver resolver(io);
-    boost::system::error_code ec;
-    auto results = resolver.resolve(host, std::to_string(port), ec);
-    if(ec) {
-        return ret;
-    }
+                addrinfo = addrinfo->ai_next;
+            }
 
-    for(const auto &entry : results) {
-        ret.push_back(make_address(entry.endpoint()));
+        }
     }
 
     return ret;
