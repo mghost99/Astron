@@ -4,6 +4,9 @@ Building with GNU _Make_ on Linux
 **Last updated: 11/11/2025**
 *The commands below assume you are using a Linux distro with a base of 25.10 (Ubuntu/Debian)*
 
+> [!NOTE]
+> If you are using **Arch Linux** or an Arch-based distro, see the [Arch Linux Build Guide](arch-linux.md).
+
 ### Dependencies ###
 
 You will need to clone the repository first.

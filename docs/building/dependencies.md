@@ -59,6 +59,21 @@ sudo apt install bison curl flex g++ git gnupg libboost-dev libicu-dev \
     libzstd-dev pkg-config
 ```
 
+### Arch Linux ###
+
+**Required packages:**
+```bash
+sudo pacman -S --needed base-devel cmake boost boost-libs icu libsasl \
+    openssl libuv yaml-cpp zstd postgresql-libs curl flex bison git \
+    gnupg pkgconf mongo-c-driver
+```
+
+**MongoDB packages:**
+```bash
+sudo pacman -S --needed libpcap pcre snappy gperftools python \
+    python-pip python-pymongo readline libstemmer
+```
+
 **MongoDB packages:**
 ```bash
 sudo apt install -y git build-essential pkg-config libcurl4-openssl-dev \

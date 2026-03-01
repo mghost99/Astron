@@ -8,7 +8,8 @@ Astron uses **CMake** as its cross-platform build system. Choose the guide for y
 ### Build Guides by Platform ###
 
 📋 **Linux**  
-→ [Linux Build Guide (Make)](linux-gnu-make.md)
+→ [Debian/Ubuntu Build Guide](linux-gnu-make.md)  
+→ [Arch Linux Build Guide](arch-linux.md)
 
 🍎 **macOS**  
 → [macOS Build Guide (Homebrew)](macos-homebrew.md)

@@ -196,14 +196,30 @@ if(BUILD_DBSERVER)
 	# Modern MongoDB C++ driver uses pkg-config
 	find_package(PkgConfig QUIET)
 	if(PKG_CONFIG_FOUND)
+		# Add /usr/local/lib/pkgconfig to PKG_CONFIG_PATH if it exists
+		if(EXISTS "/usr/local/lib/pkgconfig")
+			set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/usr/local/lib/pkgconfig")
+		endif()
+
 		pkg_check_modules(LIBMONGOCXX QUIET libmongocxx)
 		pkg_check_modules(LIBBSONCXX QUIET libbsoncxx)
 	endif()
 
-	# Fall back to legacy Find modules if needed
+	# Fall back to legacy Find modules or modern CMake config if needed
 	if(NOT LIBMONGOCXX_FOUND)
+		# Add common installation prefixes to search path
+		list(APPEND CMAKE_PREFIX_PATH "/usr/local" "/usr")
+		
 		find_package(libmongocxx QUIET)
 		find_package(libbsoncxx QUIET)
+		
+		# If found via find_package, map variables to what the rest of the script expects
+		if(libmongocxx_FOUND)
+			set(LIBMONGOCXX_FOUND TRUE)
+			set(LIBMONGOCXX_LIBRARIES mongocxx_shared) # Default for modern driver
+			set(LIBBSONCXX_LIBRARIES bsoncxx_shared)
+		endif()
+
 		find_package(libmongocxx-static QUIET)
 		find_package(libbsoncxx-static QUIET)
 	endif()
@@ -221,6 +237,7 @@ if(BUILD_DBSERVER)
 	endif()
 	
 	if(BUILD_DB_MONGO)
+		add_definitions(-DBUILD_DB_MONGO)
 		list(APPEND DBSERVER_FILES
 			src/database/MongoDatabase.cpp)
 		
