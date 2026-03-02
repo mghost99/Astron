@@ -49,7 +49,7 @@ endif()
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
 	RelWithDebInfo Release Debug)
 
-### Define astron’s git aha for use in program ###
+### Define astron's git sha for use in program ###
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
 	find_package(Git)
 	if(GIT_FOUND)
