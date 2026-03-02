@@ -2,7 +2,7 @@
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
-#include <shared_mutex>
+#include <mutex>
 #include "core/types.h"
 #include <boost/icl/interval_map.hpp>
 
@@ -84,6 +84,6 @@ class ChannelMap
     // Range channel subscriptions
     boost::icl::interval_map<channel_t, std::unordered_set<ChannelSubscriber *> > m_range_subscriptions;
 
-    // Reader-writer lock: allows multiple concurrent readers, single writer
-    mutable std::shared_mutex m_lock;
+    // In order to make this object thread-safe...
+    std::recursive_mutex m_lock;
 };

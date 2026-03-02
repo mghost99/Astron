@@ -1,5 +1,5 @@
 #include "shutdown.h"
-#include <cstdio>
+#include <stdio.h>
 #include <iostream>
 #include <mutex>
 #ifdef _WIN32
@@ -8,8 +8,8 @@
 #  endif
 #  include <windows.h>
 #else
-#  include <csignal>
-#  include <cstdlib>
+#  include <signal.h>
+#  include <stdlib.h>
 #  include <unistd.h>
 #endif
 using namespace std;

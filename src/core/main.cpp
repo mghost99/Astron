@@ -356,9 +356,6 @@ void printCompiledOptions(ostream &s)
 #ifdef BUILD_DB_SQL
       "(With SQL DB Support) "
 #endif //End DB_SQL
-#ifdef BUILD_DB_MONGO
-      "(With MongoDB Support) "
-#endif //End DB_MONGO
 
 #endif //End DBSERVER
       "\n";

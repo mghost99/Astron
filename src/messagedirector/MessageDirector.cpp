@@ -26,10 +26,7 @@ MessageDirector MessageDirector::singleton;
 
 
 MessageDirector::MessageDirector() :  m_initialized(false), m_net_acceptor(nullptr), m_upstream(nullptr),
-    m_shutdown(false), m_main_is_routing(false), 
-    m_num_threads(std::max(2u, std::thread::hardware_concurrency())),
-    m_messages(1024),  // Lock-free queue with 1024 initial capacity
-    m_log("msgdir", "Message Director")
+    m_shutdown(false), m_main_is_routing(false), m_thread(nullptr), m_log("msgdir", "Message Director")
 {
 }
 
@@ -41,12 +38,6 @@ MessageDirector::~MessageDirector()
     m_participants.clear();
 
     process_terminates();
-    
-    // Clean up any remaining messages in the lock-free queue
-    MessagePair* msg;
-    while(m_messages.pop(msg)) {
-        delete msg;
-    }
 }
 
 void MessageDirector::init_network()
@@ -81,22 +72,7 @@ void MessageDirector::init_network()
         }
 
         if(threaded_mode.get_val()) {
-            m_log.info() << "Starting thread pool with " << m_num_threads << " worker threads..." << std::endl;
-            
-            // Spawn thread pool
-            for(size_t i = 0; i < m_num_threads; ++i) {
-                m_thread_pool.emplace_back([this, i]() {
-                    this->routing_thread(i);
-                });
-            }
-            
-            // Add periodic cleanup task to process terminated participants safely
-            // This ensures participants are only deleted from the main thread
-            m_cleanup_timer = g_loop->resource<uvw::TimerHandle>();
-            m_cleanup_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent&, uvw::TimerHandle&) {
-                this->process_terminates();
-            });
-            m_cleanup_timer->start(uvw::TimerHandle::Time{50}, uvw::TimerHandle::Time{50}); // Every 50ms
+            m_thread.reset(new std::thread(std::bind(&MessageDirector::routing_thread, this)));
         }
 
         m_initialized = true;
@@ -105,37 +81,38 @@ void MessageDirector::init_network()
 
 void MessageDirector::shutdown_threading()
 {
-    if(m_thread_pool.empty()) {
+    if(!m_thread) {
         return;
     }
 
-    // Signal all routing threads to shut down
-    m_log.info() << "Shutting down thread pool..." << std::endl;
-    m_shutdown.store(true, std::memory_order_release);
-    
-    // C++20 jthread will auto-join on destruction, but we can explicitly clear
-    m_thread_pool.clear();
-    
-    m_log.info() << "Thread pool shutdown complete." << std::endl;
+    // Signal routing thread to shut down:
+    {
+        std::lock_guard<std::mutex> lock(m_messages_lock);
+        m_shutdown = true;
+        m_cv.notify_one();
+    }
+
+    // Wait for it to do so:
+    m_thread->join();
+    m_thread.reset();
 }
 
 void MessageDirector::route_datagram(MDParticipantInterface *p, DatagramHandle dg)
 {
-    // Allocate message pair for lock-free queue
-    MessagePair* msg = new MessagePair(p, dg);
-    
-    // Push to lock-free queue - completely wait-free!
-    while(!m_messages.push(msg)) {
-        // Queue is full (unlikely with 1024 capacity), spin briefly
-        std::this_thread::yield();
-    }
+    std::unique_lock<std::mutex> lock(m_messages_lock);
 
-    if(!m_thread_pool.empty()) {
-        // Thread pool is active, workers will pick it up automatically
+    // We need to hold the lock to push the datagram into the message queue, and to signal the MD thread (if in threaded mode).
+    m_messages.push(std::make_pair(p, dg));
+
+    if(m_thread) {
+        // If in threaded mode, ring the bell to let the MD thread know we have a datagram to process and return.
+        m_cv.notify_one();
         return;
     }
 
-    // Non-threaded mode fallback
+    // We don't need to hold the message lock past this point, as we're not in threaded mode.
+    lock.unlock();
+
     if(std::this_thread::get_id() != g_main_thread_id) {
         // We aren't working in threaded mode, but we aren't in the main thread
         // either. For safety, we should post this down to the main thread.
@@ -160,37 +137,48 @@ void MessageDirector::flush_queue()
 
     m_main_is_routing = true;
     
-    // Process messages from lock-free queue
-    MessagePair* msg;
-    while(m_messages.pop(msg)) {
-        process_datagram(msg->first, msg->second);
-        delete msg;
+    {
+        std::unique_lock<std::mutex> lock(m_messages_lock);
+
+        while(!m_messages.empty()) {
+            // Get and process the datagram:
+            auto msg = m_messages.front();
+            m_messages.pop();
+
+            lock.unlock();
+            process_datagram(msg.first, msg.second);
+            lock.lock();
+        }
     }
 
     // We're done flushing, we can now be invoked from others.
     m_main_is_routing = false;
 }
 
-// Thread pool worker function - runs in parallel across multiple threads
-void MessageDirector::routing_thread(size_t thread_id)
+// This function runs in a thread; it loops until it's told to shut down:
+void MessageDirector::routing_thread()
 {
-    m_log.debug() << "Routing thread " << thread_id << " started" << std::endl;
-    
-    while(!m_shutdown.load(std::memory_order_acquire)) {
-        MessagePair* msg;
-        
-        if(m_messages.pop(msg)) {
-            // Got a message, process it!
-            process_datagram(msg->first, msg->second);
-            delete msg;
-        } else {
-            // Queue is empty, yield to avoid busy-waiting
-            // This is much more efficient than condition variables for lock-free queues
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
+    std::unique_lock<std::mutex> lock(m_messages_lock);
+
+    while(true) {
+        // Wait for something interesting to handle...
+        while(m_messages.empty() && !m_shutdown) {
+            m_cv.wait(lock);
         }
+
+        if(m_shutdown) {
+            // Ehh, we've been told to shut off:
+            return;
+        }
+
+        // Get and process the message:
+        auto msg = m_messages.front();
+        m_messages.pop();
+
+        lock.unlock();
+        process_datagram(msg.first, msg.second);
+        lock.lock();
     }
-    
-    m_log.debug() << "Routing thread " << thread_id << " exiting" << std::endl;
 }
 
 void MessageDirector::process_datagram(MDParticipantInterface *p, DatagramHandle dg)
@@ -230,19 +218,8 @@ void MessageDirector::process_datagram(MDParticipantInterface *p, DatagramHandle
     }
 
     // Send the datagram to each participant
-    // Make a copy to avoid iterator invalidation if participant terminates during handling
-    std::vector<MDParticipantInterface*> participants_to_notify;
-    participants_to_notify.reserve(receiving_participants.size());
     for(const auto& it : receiving_participants) {
-        participants_to_notify.push_back(static_cast<MDParticipantInterface *>(it));
-    }
-    
-    for(auto participant : participants_to_notify) {
-        // Check if participant is still valid (not terminated)
-        if(participant->is_terminated()) {
-            continue;
-        }
-        
+        auto participant = static_cast<MDParticipantInterface *>(it);
         DatagramIterator msg_dgi(dg, dgi.tell());
 
         try {
@@ -274,14 +251,8 @@ void MessageDirector::process_datagram(MDParticipantInterface *p, DatagramHandle
 
     // N.B. Participants may reach end-of-life after receiving a datagram, or may
     // be terminated in another thread (for example if a network socket closes);
-    // In single-threaded mode, process terminates immediately.
-    // In multi-threaded mode, terminates are processed periodically to avoid
-    // deleting participants while worker threads might be using them.
-    if(m_thread_pool.empty()) {
-        // Single-threaded mode - safe to process immediately
-        process_terminates();
-    }
-    // In threaded mode, terminates are processed by the periodic cleanup task
+    // either way, process any received terminates after processing a datagram.
+    process_terminates();
 }
 
 

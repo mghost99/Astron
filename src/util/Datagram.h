@@ -7,7 +7,6 @@
 #include <stdexcept>
 #include <string.h> // memcpy
 #include <memory>
-#include <memory_resource>
 #include "core/types.h"
 #include "dclass/util/byteorder.h"
 
@@ -32,19 +31,6 @@ class DatagramOverflow : public std::runtime_error
     DatagramOverflow(const std::string &what) : std::runtime_error(what) { }
 };
 
-// DatagramPool: High-performance memory pool for datagram buffers
-// Uses thread-local pools to avoid contention
-class DatagramPool
-{
-  public:
-    static std::pmr::memory_resource* get_memory_resource()
-    {
-        // Thread-local pool for zero-contention allocation
-        thread_local std::pmr::unsynchronized_pool_resource pool;
-        return &pool;
-    }
-};
-
 // A Datagram is a buffer of binary data ready for networking (ie. formatted according to Astron's
 // over-the-wire formatting specification).  It is most often used to represent Astron client and
 // server messages, as well as occasionally DistributedObject field data.
@@ -54,7 +40,6 @@ class Datagram
     uint8_t* buf;
     size_t buf_cap; // Can be larger than buf_offset, so use a size_t
     size_t buf_offset;
-    std::pmr::polymorphic_allocator<uint8_t> m_allocator;
 
     void check_add_length(dgsize_t len)
     {
@@ -67,20 +52,17 @@ class Datagram
         }
 
         if(new_offset > buf_cap) {
-            size_t new_cap = buf_cap + len + 64;
-            uint8_t *tmp_buf = m_allocator.allocate(new_cap);
+            uint8_t *tmp_buf = new uint8_t[buf_cap + len + 64];
             memcpy(tmp_buf, buf, buf_cap);
-            m_allocator.deallocate(buf, buf_cap);
+            delete [] buf;
             buf = tmp_buf;
-            buf_cap = new_cap;
+            buf_cap = buf_cap + len + 64;
         }
     }
     // default-constructor:
     //     creates a new datagram with some pre-allocated space
-    Datagram() : buf(nullptr), buf_cap(64), buf_offset(0),
-                 m_allocator(DatagramPool::get_memory_resource())
+    Datagram() : buf(new uint8_t[64]), buf_cap(64), buf_offset(0)
     {
-        buf = m_allocator.allocate(64);
     }
 
     /*
@@ -98,73 +80,63 @@ class Datagram
     // copy-constructor:
     //     creates a new datagram which is a deep-copy of another datagram;
     //     capacity is not perserved and instead is reduced to the size of the source datagram.
-    Datagram(const Datagram &dg) : buf(nullptr), buf_cap(dg.size()),
-        buf_offset(dg.size()), m_allocator(DatagramPool::get_memory_resource())
+    Datagram(const Datagram &dg) : buf(new uint8_t[dg.size()]), buf_cap(dg.size()),
+        buf_offset(dg.size())
     {
-        buf = m_allocator.allocate(dg.size());
         memcpy(buf, dg.buf, dg.size());
     }
 
     // shallow-constructor:
     //     creates a new datagram that uses an existing buffer as its data
-    //     Note: This does NOT use the pool since the buffer is externally managed
     Datagram(uint8_t *data, dgsize_t length, dgsize_t capacity) : buf(data),
-        buf_cap(capacity), buf_offset(length), m_allocator(std::pmr::null_memory_resource())
+        buf_cap(capacity), buf_offset(length)
     {
     }
 
     // binary-constructor(pointer):
     //     creates a new datagram with a copy of the data contained at the pointer.
-    Datagram(const uint8_t *data, dgsize_t length) : buf(nullptr), buf_cap(length),
-        buf_offset(length), m_allocator(DatagramPool::get_memory_resource())
+    Datagram(const uint8_t *data, dgsize_t length) : buf(new uint8_t[length]), buf_cap(length),
+        buf_offset(length)
     {
-        buf = m_allocator.allocate(length);
         memcpy(buf, data, length);
     }
 
     // binary-constructor(vector):
     //     creates a new datagram with a copy of the binary data contained in a vector<uint8_t>.
-    Datagram(const std::vector<uint8_t> &data) : buf(nullptr),
-        buf_cap(data.size()), buf_offset(data.size()), m_allocator(DatagramPool::get_memory_resource())
+    Datagram(const std::vector<uint8_t> &data) : buf(new uint8_t[data.size()]),
+        buf_cap(data.size()), buf_offset(data.size())
     {
-        buf = m_allocator.allocate(data.size());
         memcpy(buf, &data[0], data.size());
     }
 
     // binary-constructor(string):
     //     creates a new datagram with a copy of the data contained in a string, treated as binary.
-    Datagram(const std::string &data) : buf(nullptr), buf_cap(data.length()),
-        buf_offset(data.length()), m_allocator(DatagramPool::get_memory_resource())
+    Datagram(const std::string &data) : buf(new uint8_t[data.length()]), buf_cap(data.length()),
+        buf_offset(data.length())
     {
-        buf = m_allocator.allocate(data.length());
         memcpy(buf, data.c_str(), data.length());
     }
 
     // server-header-constructor(single-receiver):
     //     creates a new datagram initialized with a server header (accepts only 1 receiver).
     Datagram(channel_t to_channel, channel_t from_channel, uint16_t message_type) :
-        buf(nullptr), buf_cap(64), buf_offset(0), m_allocator(DatagramPool::get_memory_resource())
+        buf(new uint8_t[64]), buf_cap(64), buf_offset(0)
     {
-        buf = m_allocator.allocate(64);
         add_server_header(to_channel, from_channel, message_type);
     }
 
     // server-header-constructor(multi-target):
     //     creates a new datagram initialized with a server header (accepts a set of receivers)
     Datagram(const std::unordered_set<channel_t> &to_channels, channel_t from_channel,
-             uint16_t message_type) : buf(nullptr), buf_cap(64), buf_offset(0),
-             m_allocator(DatagramPool::get_memory_resource())
+             uint16_t message_type) : buf(new uint8_t[64]), buf_cap(64), buf_offset(0)
     {
-        buf = m_allocator.allocate(64);
         add_server_header(to_channels, from_channel, message_type);
     }
 
     // control-header constructor:
     //     creates a new datagram initialized with a control header containing the msgtype.
-    Datagram(uint16_t message_type) : buf(nullptr), buf_cap(64), buf_offset(0),
-        m_allocator(DatagramPool::get_memory_resource())
+    Datagram(uint16_t message_type) : buf(new uint8_t[64]), buf_cap(64), buf_offset(0)
     {
-        buf = m_allocator.allocate(64);
         add_control_header(message_type);
     }
 
@@ -231,10 +203,7 @@ class Datagram
     // destructor
     ~Datagram()
     {
-        // Only deallocate if we actually allocated (null_memory_resource for shallow constructor)
-        if(m_allocator.resource() != std::pmr::null_memory_resource()) {
-            m_allocator.deallocate(buf, buf_cap);
-        }
+        delete [] buf;
     }
 
     // add_bool adds an 8-bit integer to the datagram that is guaranteed

@@ -12,7 +12,7 @@ Logger::Logger(const std::string &log_file, LogSeverity sev, bool console_output
 {
 }
 
-#ifdef ASTRON_DEBUG_MESSAGES
+#if 1
 Logger::Logger() : m_buf(), m_severity(LSEVERITY_DEBUG), m_output(&m_buf), m_color_enabled(true)
 #else
 Logger::Logger() : m_buf(), m_severity(LSEVERITY_INFO), m_output(&m_buf), m_color_enabled(true)

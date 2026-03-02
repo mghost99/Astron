@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include <deque>
 #include <queue>
 #include <mutex>
 #include "deps/uvw/uvw.hpp"
@@ -163,7 +162,7 @@ private:
     }
 
     bool m_is_sending = false;
-    std::unique_ptr<char[]> m_send_buf;
+    char *m_send_buf = nullptr;
 
     NetworkHandler *m_handler;
     std::shared_ptr<uvw::TcpHandle> m_socket;
@@ -180,7 +179,7 @@ private:
     uint64_t m_total_queue_size = 0;
     uint64_t m_max_queue_size = 0;
     unsigned int m_write_timeout = 0;
-    std::deque<DatagramHandle> m_send_queue;  // deque is O(1) for push_back/pop_front vs vector
+    std::vector<DatagramHandle> m_send_queue;
 
     std::mutex m_mutex;
 

@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdarg>
+#include <stdarg.h>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -183,7 +183,7 @@ class LogCategory
 		return out; \
 	}
 
-#ifdef ASTRON_DEBUG_MESSAGES
+#if 1
     // packet() provides a stream with the time and "PACKET" severity preprended to the message.
     // packet messages are only output when compiled with -DASTRON_DEBUG_MESSAGES.
     F(packet, LSEVERITY_PACKET)

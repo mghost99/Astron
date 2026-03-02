@@ -3,6 +3,10 @@
 // Created by: drose (05 Oct, 2000)
 */
 
+%option nounput
+%option never-interactive
+%option noyywrap
+
 %{
 
 	#include "dc/File.h"
@@ -14,17 +18,12 @@
 	using namespace dclass;
 
 	static int yyinput(void); // declared by flex.
-	namespace dclass{ int run_lexer(); }
 
 	#define YYSTYPE dclass::TokenType
 	extern YYSTYPE yyltype;
 
 	#define YY_NO_UNISTD_H
 	#define YY_DECL int dclass::run_lexer(void)
-
-////////////////////////////////////////////////////////////////////
-// Static variables
-////////////////////////////////////////////////////////////////////
 
 	// We'll increment line_number and col_number as we parse the file, so
 	// that we can report the position of an error.
@@ -439,9 +438,6 @@
 
 %}
 
-%option nounput
-%option never-interactive
-%option noyywrap
 
 INTEGERNUM  ([0-9]+)
 HEXNUM      (0x[0-9a-fA-F]*)

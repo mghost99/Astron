@@ -124,7 +124,7 @@
 %}
 
 // Use verbose errors
-%define parse.error verbose
+%error-verbose
 %debug
 
 /* Value tokens */

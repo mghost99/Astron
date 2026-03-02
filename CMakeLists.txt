@@ -1,10 +1,8 @@
-cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
-project(Astron)
-
-set(CMAKE_CXX_STANDARD 20)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+project(Astron)
 
 # Find Python 3 for running tests
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -51,7 +49,7 @@ endif()
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
 	RelWithDebInfo Release Debug)
 
-### Define astron's git sha for use in program ###
+### Define astron’s git aha for use in program ###
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
 	find_package(Git)
 	if(GIT_FOUND)
@@ -71,13 +69,7 @@ endif()
 # Common flags:
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-error=deprecated-declarations -Wno-error=free-nonheap-object")
-	
-	# Release optimizations: aggressive optimization + LTO
-	set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -DNDEBUG" CACHE STRING "Release flags" FORCE)
-	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -march=native -flto -g -DNDEBUG" CACHE STRING "RelWithDebInfo flags" FORCE)
-	set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto" CACHE STRING "Release linker flags" FORCE)
-	set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "-flto" CACHE STRING "RelWithDebInfo linker flags" FORCE)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-error=deprecated-declarations")
 endif()
 
 # Clang-specific flags:
@@ -86,21 +78,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 ### Debug Flags -- compile in spam/debug log messages ###
-# Note: Ignoring 'free-nonheap-object' warns due to Bison issue in the generated parser.cpp file.
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3 -O0 -DASTRON_DEBUG_MESSAGES -Wno-error=free-nonheap-object")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DASTRON_DEBUG_MESSAGES")
 
 
 ### OS Specific Settings ###
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")	### Windows requires winsock
 	list(APPEND EXTRA_LIBS wsock32 ws2_32)
-	# Windows system libraries required by MongoDB C driver
-	list(APPEND EXTRA_LIBS dnsapi bcrypt ncrypt secur32 crypt32)
-	# Compression libraries required by MongoDB C driver
-	list(APPEND EXTRA_LIBS snappy zstd)
-	# Fix for weak symbol multiple definitions with MinGW static libraries (MongoDB)
-	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
-	endif()
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")		### Linux requires pthreads
@@ -108,12 +91,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")		### Linux requires pthreads
 endif()
 
 ### YAML Depedency -- required by config, used by yaml database ###
-# Note: On Windows MinGW, use DLL version due to static lib having DLL exports
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-	set(YAMLCPP_USE_STATIC_LIBS OFF CACHE BOOL "If true, will try to find static YamlCpp first instead of dynamic.")
-else()
-	set(YAMLCPP_USE_STATIC_LIBS ON CACHE BOOL "If true, will try to find static YamlCpp first instead of dynamic.")
-endif()
+set(YAMLCPP_USE_STATIC_LIBS ON CACHE BOOL "If true, will try to find static YamlCpp first instead of dynamic.")
 find_package(YamlCpp REQUIRED)
 include_directories(${YAMLCPP_INCLUDE_DIR})
 link_directories(${YAMLCPP_LIBRARY_DIR})
@@ -132,14 +110,14 @@ link_directories(${LIBUV_LIBRARY_DIR})
 message(STATUS "Found the libuv library:")
 message("	${LIBUV_LIBRARY}\n")
 
-# We only really need this for Boost's ICL at this point
-# Use CONFIG mode for modern CMake to avoid deprecated FindBoost module
-find_package(Boost REQUIRED CONFIG)
-if(Boost_FOUND)
-	include_directories(${Boost_INCLUDE_DIRS})
+# We only really need this for Boost's ICL at this point, but until it's fully deprecated:
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 OLD)
 endif()
+find_package(Boost REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
 
-set(USE_32BIT_DATAGRAMS OFF CACHE BOOL
+set(USE_32BIT_DATAGRAMS ON CACHE BOOL
 	"If on, datagrams and dclass fields will use 32-bit length tags instead of 16-bit.")
 if(USE_32BIT_DATAGRAMS)
 	add_definitions(-DASTRON_32BIT_DATAGRAMS)
@@ -193,61 +171,25 @@ if(BUILD_DBSERVER)
 	endif()
 
 	### Check for the presence of the MongoDB client library ###
-	# Modern MongoDB C++ driver uses pkg-config
-	find_package(PkgConfig QUIET)
-	if(PKG_CONFIG_FOUND)
-		# Add /usr/local/lib/pkgconfig to PKG_CONFIG_PATH if it exists
-		if(EXISTS "/usr/local/lib/pkgconfig")
-			set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/usr/local/lib/pkgconfig")
-		endif()
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(MONGOCXX QUIET libmongocxx)
+	pkg_check_modules(BSONCXX QUIET libbsoncxx)
 
-		pkg_check_modules(LIBMONGOCXX QUIET libmongocxx)
-		pkg_check_modules(LIBBSONCXX QUIET libbsoncxx)
-	endif()
-
-	# Fall back to legacy Find modules or modern CMake config if needed
-	if(NOT LIBMONGOCXX_FOUND)
-		# Add common installation prefixes to search path
-		list(APPEND CMAKE_PREFIX_PATH "/usr/local" "/usr")
-		
-		find_package(libmongocxx QUIET)
-		find_package(libbsoncxx QUIET)
-		
-		# If found via find_package, map variables to what the rest of the script expects
-		if(libmongocxx_FOUND)
-			set(LIBMONGOCXX_FOUND TRUE)
-			set(LIBMONGOCXX_LIBRARIES mongocxx_shared) # Default for modern driver
-			set(LIBBSONCXX_LIBRARIES bsoncxx_shared)
-		endif()
-
-		find_package(libmongocxx-static QUIET)
-		find_package(libbsoncxx-static QUIET)
-	endif()
-
-	if(LIBMONGOCXX_FOUND OR LIBMONGOCXX_LIBRARIES OR LIBMONGOCXX_STATIC_LIBRARIES)
+	if(MONGOCXX_FOUND AND BSONCXX_FOUND)
 		set(BUILD_DB_MONGO ON CACHE BOOL "If on, will support MongoDB.")
-		message(STATUS "MongoDB client library found")
-		if(LIBMONGOCXX_FOUND)
-			message(STATUS "  libmongocxx version: ${LIBMONGOCXX_VERSION}")
-			message(STATUS "  libbsoncxx version: ${LIBBSONCXX_VERSION}")
-		endif()
+		message(STATUS "MongoDB client library found via PkgConfig")
+		set(LIBMONGOCXX_LIBRARIES ${MONGOCXX_LIBRARIES})
+		set(LIBMONGOCXX_INCLUDE_DIRS ${MONGOCXX_INCLUDE_DIRS})
+		set(LIBBSONCXX_LIBRARIES ${BSONCXX_LIBRARIES})
+		set(LIBBSONCXX_INCLUDE_DIRS ${BSONCXX_INCLUDE_DIRS})
 	else()
 		unset(BUILD_DB_MONGO CACHE)
-		message(STATUS "MongoDB client library not found")
+		message(STATUS "MongoDB client library not found via PkgConfig")
 	endif()
-	
 	if(BUILD_DB_MONGO)
-		add_definitions(-DBUILD_DB_MONGO)
 		list(APPEND DBSERVER_FILES
 			src/database/MongoDatabase.cpp)
-		
-		# Use pkg-config results if available
-		if(LIBMONGOCXX_FOUND AND PKG_CONFIG_FOUND)
-			include_directories(${LIBMONGOCXX_INCLUDE_DIRS} ${LIBBSONCXX_INCLUDE_DIRS})
-			link_directories(${LIBMONGOCXX_LIBRARY_DIRS} ${LIBBSONCXX_LIBRARY_DIRS})
-			list(APPEND DB_LIBRARY_NAMES ${LIBMONGOCXX_LIBRARIES} ${LIBBSONCXX_LIBRARIES})
-		# Fall back to legacy detection
-		elseif(LIBMONGOCXX_LIBRARIES)
+		if(LIBMONGOCXX_LIBRARIES)
 			include_directories(${LIBMONGOCXX_INCLUDE_DIRS} ${LIBBSONCXX_INCLUDE_DIRS})
 			link_directories(${LIBMONGOCXX_LIBRARY_DIRS} ${LIBBSONCXX_LIBRARY_DIRS})
 			list(APPEND DB_LIBRARY_NAMES ${LIBMONGOCXX_LIBRARIES} ${LIBBSONCXX_LIBRARIES})
@@ -312,15 +254,12 @@ if(BUILD_DBSERVER)
 			add_definitions(-DBUILD_DB_SQL)
 			include_directories(${SOCI_INCLUDE_DIRS})
 			link_directories(${SOCI_LIBRARY_DIR})
-		set(DBSERVER_FILES
-			${DBSERVER_FILES}
-			src/database/SociSQLDatabase.cpp
-		)
+			set(DBSERVER_FILES
+				${DBSERVER_FILES}
+				src/database/SociSQLDatabase.cpp
+			)
 
-			list(APPEND DB_LIBRARY_NAMES ${SOCI_LIBRARY})
-			if(NOT WIN32)
-				list(APPEND DB_LIBRARY_NAMES dl)
-			endif()
+			list(APPEND DB_LIBRARY_NAMES soci_core dl)
 			if(BUILD_DB_POSTGRESQL)
 			list(APPEND DB_LIBRARY_NAMES pq)
 			add_test(db_pgsql 

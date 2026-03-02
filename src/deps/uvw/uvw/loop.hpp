@@ -2,7 +2,7 @@
 
 
 #ifdef _WIN32
-#include <version>
+#include <ciso646>
 #endif
 
 #include <functional>

@@ -3,13 +3,11 @@
 #include <unordered_set>
 #include <string>
 #include <queue>
-#include <deque>
 #include <thread>
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <condition_variable>
-#include <boost/lockfree/queue.hpp>
 #include <boost/icl/interval_map.hpp>
 #include "ChannelMap.h"
 #include "core/global.h"
@@ -68,27 +66,19 @@ class MessageDirector final : public ChannelMap
     std::unordered_set<MDParticipantInterface*> m_terminated_participants;
 
     // Threading stuff:
-    std::atomic<bool> m_shutdown;
+    bool m_shutdown;
     bool m_main_is_routing;
-    
-    // Thread pool for parallel message processing
-    std::vector<std::jthread> m_thread_pool;  // C++20 jthread auto-joins on destruction
-    size_t m_num_threads;
-    
-    // Lock-free queue for high-performance message routing
-    using MessagePair = std::pair<MDParticipantInterface *, DatagramHandle>;
-    boost::lockfree::queue<MessagePair*> m_messages;
-    
+    std::unique_ptr<std::thread> m_thread;
     std::mutex m_participants_lock;
     std::mutex m_terminated_lock;
-    
-    // Periodic cleanup timer for thread-safe participant deletion
-    std::shared_ptr<uvw::TimerHandle> m_cleanup_timer;
+    std::mutex m_messages_lock;
+    std::queue<std::pair<MDParticipantInterface *, DatagramHandle>> m_messages;
+    std::condition_variable m_cv;
     
     void flush_queue();
     void process_datagram(MDParticipantInterface *p, DatagramHandle dg);
     void process_terminates();
-    void routing_thread(size_t thread_id);
+    void routing_thread();
     void shutdown_threading();
 
     LogCategory m_log;

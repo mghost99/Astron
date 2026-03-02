@@ -1,27 +1,29 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(DistributedClasses)
+include_directories(.)
 
-find_package(BISON REQUIRED)
-find_package(FLEX REQUIRED)
+find_package(BISON)
+if(BISON_FOUND)
+    add_custom_command(
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/file/parser.ypp
+      COMMAND ${BISON_EXECUTABLE} --defines=parser.h -o parser.cpp parser.ypp
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/file
+      COMMENT "Generating dclass/parser.cpp"
+      OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/file/parser.cpp
+             ${CMAKE_CURRENT_SOURCE_DIR}/file/parser.h
+    )
+endif(BISON_FOUND)
 
-# Generate parser files with Bison
-add_custom_command(
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/file/parser.ypp
-    COMMAND ${BISON_EXECUTABLE} --defines=parser.h -o parser.cpp parser.ypp
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/file
-    COMMENT "Generating dclass/parser.cpp"
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/file/parser.cpp
-           ${CMAKE_CURRENT_SOURCE_DIR}/file/parser.h
-)
-
-# Generate lexer files with Flex
-add_custom_command(
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/file/lexer.lpp
-    COMMAND ${FLEX_EXECUTABLE} -olexer.cpp lexer.lpp
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/file
-    COMMENT "Generating dclass/lexer.cpp"
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/file/lexer.cpp
-)
+find_package(FLEX)
+if(FLEX_FOUND)
+    add_custom_command(
+      DEPENDS file/lexer.lpp
+      COMMAND ${FLEX_EXECUTABLE} -olexer.cpp lexer.lpp
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/file
+      COMMENT "Generating dclass/lexer.cpp"
+      OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/file/lexer.cpp
+    )
+endif(FLEX_FOUND)
 
 add_library(dclass
 	# Helper Classes
@@ -52,19 +54,10 @@ add_library(dclass
 	value/parse.cpp
 	value/default.cpp
 )
+set_target_properties(dclass PROPERTIES LINK_FLAGS -lfl)
 
-# Link flex library (not needed on modern Linux when providing yywrap/noyywrap)
-# if(NOT WIN32)
-# 	target_link_libraries(dclass PRIVATE fl)
-# endif()
-
-# Set include directories for the target
-target_include_directories(dclass PUBLIC 
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-	$<INSTALL_INTERFACE:include>
-)
-
-# Workaround for Flex bug #140:
+# Workaround for Flex bug #140 and Bison free-nonheap-object warning
 if(NOT MSVC)
-	set_source_files_properties(file/lexer.cpp PROPERTIES COMPILE_FLAGS -Wno-sign-compare)
+	set_source_files_properties(file/lexer.cpp PROPERTIES COMPILE_FLAGS "-Wno-sign-compare")
+	set_source_files_properties(file/parser.cpp PROPERTIES COMPILE_FLAGS "-Wno-free-nonheap-object -Wno-error=free-nonheap-object")
 endif()

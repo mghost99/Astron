@@ -117,8 +117,8 @@ size_t HAProxyHandler::parse_v2_block()
         return 0;
     }
 
-    char* remote_address = nullptr;
-    char* local_address = nullptr;
+    char* remote_address = NULL;
+    char* local_address = NULL;
     int port_offset = HAPROXY_HEADER_MIN;
 
     if(family == 0x1) {
@@ -164,7 +164,7 @@ size_t HAProxyHandler::parse_v1_block()
 
     char* cr_chr = (char*)memchr(&m_data_buf[0], '\r', capped_length);
 
-    if(cr_chr == nullptr) {
+    if(cr_chr == NULL) {
         if(m_data_buf.size() >= HAPROXY_HEADER_MAX - 1) {
             // We should have a CR by now, if we don't we're not dealing with a valid PROXYv1 block as per the spec.
             set_error(UV_EPROTO);
@@ -184,7 +184,7 @@ size_t HAProxyHandler::parse_v1_block()
     }
 
     char* lf_chr = (char*)memchr(&m_data_buf[0], '\n', capped_length);
-    if(lf_chr == nullptr || lf_chr != cr_chr + 1) {
+    if(lf_chr == NULL || lf_chr != cr_chr + 1) {
         if(m_data_buf.size() >= HAPROXY_HEADER_MAX) {
             // We should have an LF character located after our CR by now.
             set_error(UV_EPROTO);
@@ -215,11 +215,11 @@ size_t HAProxyHandler::parse_v1_block()
 
     // Ignore the return value of the first strtok() call: It's just gonna be "PROXY"
     strtok(header_buf, " ");
-    const char *tcp = strtok(nullptr, " ");
-    const char *srcip = strtok(nullptr, " ");
-    const char *dstip = strtok(nullptr, " ");
-    const char *srcport = strtok(nullptr, " ");
-    const char *dstport = strtok(nullptr, "\r");
+    const char *tcp = strtok(NULL, " ");
+    const char *srcip = strtok(NULL, " ");
+    const char *dstip = strtok(NULL, " ");
+    const char *srcport = strtok(NULL, " ");
+    const char *dstport = strtok(NULL, "\r");
 
     if(dstport == nullptr) {
         set_error(UV_EPROTO);

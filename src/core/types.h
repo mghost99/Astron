@@ -15,33 +15,33 @@ typedef uint32_t zone_t;
 #endif
 
 /* Type limits */
-constexpr channel_t CHANNEL_MAX = static_cast<channel_t>(-1);
-constexpr doid_t DOID_MAX = static_cast<doid_t>(-1);
-constexpr zone_t ZONE_MAX = static_cast<zone_t>(-1);
-constexpr size_t ZONE_BITS = sizeof(zone_t) * 8;
+const channel_t CHANNEL_MAX = (channel_t)(-1);
+const doid_t DOID_MAX = (doid_t)(-1);
+const zone_t ZONE_MAX = (zone_t)(-1);
+const size_t ZONE_BITS = sizeof(zone_t) * 8;
 
 /* DoId constants */
-constexpr doid_t INVALID_DO_ID = 0;
+const doid_t INVALID_DO_ID = 0;
 
 /* Channel constants */
-constexpr channel_t INVALID_CHANNEL = 0;
-constexpr channel_t CONTROL_MESSAGE = 1;
-constexpr channel_t BCHAN_CLIENTS = 10;
-constexpr channel_t BCHAN_STATESERVERS = 12;
-constexpr channel_t BCHAN_DBSERVERS = 13;
-constexpr channel_t PARENT_PREFIX = (channel_t(1) << ZONE_BITS);
-constexpr channel_t DATABASE_PREFIX = (channel_t(2) << ZONE_BITS);
+const channel_t INVALID_CHANNEL = 0;
+const channel_t CONTROL_MESSAGE = 1;
+const channel_t BCHAN_CLIENTS = 10;
+const channel_t BCHAN_STATESERVERS = 12;
+const channel_t BCHAN_DBSERVERS = 13;
+const channel_t PARENT_PREFIX = (channel_t(1) << ZONE_BITS);
+const channel_t DATABASE_PREFIX = (channel_t(2) << ZONE_BITS);
 
 /* Channel building methods */
-[[nodiscard]] constexpr inline channel_t location_as_channel(doid_t parent, zone_t zone) noexcept
+inline channel_t location_as_channel(doid_t parent, zone_t zone)
 {
     return (channel_t(parent) << ZONE_BITS) | channel_t(zone);
 }
-[[nodiscard]] constexpr inline channel_t parent_to_children(doid_t parent) noexcept
+inline channel_t parent_to_children(doid_t parent)
 {
     return PARENT_PREFIX | channel_t(parent);
 }
-[[nodiscard]] constexpr inline channel_t database_to_object(doid_t object) noexcept
+inline channel_t database_to_object(doid_t object)
 {
     return DATABASE_PREFIX | channel_t(object);
 }
